@@ -38,11 +38,11 @@
         pkgs = nixpkgs.legacyPackages.${system};
         beam = pkgs.beam27Packages;
 
-        # config/{dev,test}.exs hardcode postgres on 5432 and runtime.exs honours DB_URL only under
-        # :prod and :test — so moving this port would break `mix phx.server` with no env to fix it.
+        # Off 5432/8443/8444 and below platform's 8600+ worktree lattice: shared CI runners host both.
+        # dev.exs takes the port via PGPORT (Postgrex), the test env via DB_URL (runtime.exs).
         ports = {
-          postgres = 5432;
-          kanidm = 18444;
+          postgres = 7432;
+          kanidm = 7443;
           keila = 4000;
         };
 
@@ -65,6 +65,8 @@
               ];
 
               env = {
+                PGPORT = toString ports.postgres;
+                DB_URL = "ecto://postgres:postgres@localhost:${toString ports.postgres}/keila_test";
                 KEILA_KANIDM_URL = issuer;
                 KEILA_ORIGIN = origin;
               };
