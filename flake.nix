@@ -42,7 +42,7 @@
         # :prod and :test — so moving this port would break `mix phx.server` with no env to fix it.
         ports = {
           postgres = 5432;
-          kanidm = 8444;
+          kanidm = 18444;
           keila = 4000;
         };
 
