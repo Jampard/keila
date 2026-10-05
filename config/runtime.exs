@@ -406,6 +406,13 @@ if config_env() == :prod do
   end
 end
 
+source_link =
+  []
+  |> put_if_not_empty.(:url, System.get_env("KEILA_SOURCE_URL"))
+  |> put_if_not_empty.(:revision, System.get_env("KEILA_SOURCE_REVISION"))
+
+config :keila, KeilaWeb.SourceLink, source_link
+
 # OIDC SSO
 split_list = fn
   value when value in [nil, ""] -> []

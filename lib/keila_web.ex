@@ -114,6 +114,7 @@ defmodule KeilaWeb do
       import KeilaWeb.IconHelper
       import KeilaWeb.DateTimeHelpers
       import KeilaWeb.HtmlEscapeHelper
+      import KeilaWeb.SourceLink, only: [source_url: 0]
       use KeilaWeb.Gettext
 
       alias KeilaWeb.Router.Helpers, as: Routes

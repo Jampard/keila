@@ -17,6 +17,9 @@ defmodule KeilaWeb.ApiDocsController do
         <body>
           <div id="app"></div>
           <div id="api-reference" data-url={Routes.path(@conn, "/api/v1/openapi")}></div>
+          <footer style="text-align: center; font-size: 0.75rem; padding: 1rem;">
+            <a href={KeilaWeb.SourceLink.source_url()}>Source code (modified)</a>
+          </footer>
           <script type="text/javascript">
             document.getElementById("api-reference").dataset.configuration = JSON.stringify({
               withDefaultFonts: false,

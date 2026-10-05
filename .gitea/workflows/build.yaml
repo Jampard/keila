@@ -77,6 +77,8 @@ jobs:
           podman build \
             --progress=plain \
             -f ops/Dockerfile \
+            --build-arg KEILA_SOURCE_URL=${{ vars.SOURCE_URL }} \
+            --build-arg KEILA_SOURCE_REVISION=${{ github.sha }} \
             -t $IMAGE:${{ github.ref_name }} \
             -t $IMAGE:${{ github.sha }} .
 
