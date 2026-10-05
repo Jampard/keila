@@ -31,6 +31,13 @@ defmodule Keila.Factory do
     %Keila.Auth.UserGroup{}
   end
 
+  defp do_build(:oidc_identity) do
+    %Keila.Auth.OidcIdentity{
+      issuer: "https://idp-#{get_counter_value()}.example.com",
+      subject: "sub-#{get_counter_value()}"
+    }
+  end
+
   defp do_build(:user_group_role) do
     %Keila.Auth.UserGroupRole{}
   end

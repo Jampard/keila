@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added
+- Added optional OIDC SSO: sign in via one or more OpenID Connect providers, with entitlement- or tenant-based access policies and an OIDC-only mode (see `docs/oidc-sso.md`)
+- `KEILA_OIDC_<NAME>_ADMIN_VALUE` maps an IdP-held admin group to the Keila root role, reconciled on every sign-in (see `docs/oidc-sso.md`, Administrators)
+- `KEILA_PASSWORD` now updates the root user's password on every boot rather than only at first seed, so rotating the secret and restarting is sufficient
+
 ## Version 0.30.3
 
 ### Added

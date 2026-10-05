@@ -302,6 +302,7 @@ defmodule Keila.Auth do
 
   ## Options
    - `:skip_activation_email` - Don’t send activation email if set to `true`
+   - `:changeset` - `:oidc` to create a password-less, pre-activated User
 
 
   ## Example
@@ -313,7 +314,7 @@ defmodule Keila.Auth do
           {:ok, User.t()} | {:error, Ecto.Changeset.t(User.t())}
   def create_user(params, opts \\ []) do
     Repo.transaction(fn ->
-      with {:ok, user} <- do_create_user(params),
+      with {:ok, user} <- do_create_user(params, opts),
            {:ok, account} <- Keila.Accounts.create_account(),
            :ok <- Keila.Accounts.set_user_account(user.id, account.id) do
         unless Keyword.get(opts, :skip_activation_email) do
@@ -328,9 +329,11 @@ defmodule Keila.Auth do
     end)
   end
 
-  defp do_create_user(params) do
-    params
-    |> User.creation_changeset()
+  defp do_create_user(params, opts) do
+    case Keyword.get(opts, :changeset) do
+      :oidc -> User.oidc_creation_changeset(params)
+      _ -> User.creation_changeset(params)
+    end
     |> Repo.insert()
   end
 

@@ -1,6 +1,7 @@
 <div class="container mt-8">
   <.form
     :let={f}
+    :if={not Keila.Auth.Oidc.oidc_only?()}
     for={@changeset}
     action={Routes.auth_path(@conn, :post_login)}
     method="post"
@@ -43,4 +44,20 @@
       </a>
     </p>
   </.form>
+  <div
+    :if={Keila.Auth.Oidc.login_page_providers() != []}
+    class="rounded shadow p-8 mt-8 max-w-xl mx-auto flex flex-col gap-4 bg-gray-900 text-gray-50"
+  >
+    <h1 :if={Keila.Auth.Oidc.oidc_only?()} class="text-5xl font-bold">
+      {dgettext("auth", "Sign in.")}
+    </h1>
+    <a
+      :for={provider <- Keila.Auth.Oidc.login_page_providers()}
+      href={Routes.oidc_path(@conn, :authorize, provider)}
+      class="button button--cta button--large"
+    >
+      {render_icon(:key)}
+      {Keila.Auth.Oidc.label(provider)}
+    </a>
+  </div>
 </div>

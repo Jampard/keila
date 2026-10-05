@@ -29,6 +29,22 @@ defmodule Keila.Auth.User do
   end
 
   @doc """
+  Changeset for User creation from validated OIDC claims.
+
+  No password is set; `activated_at` is set inline because the IdP has already
+  verified the email address.
+  """
+  @spec oidc_creation_changeset(t() | Ecto.Changeset.data(), map()) :: Ecto.Changeset.t(t)
+  def oidc_creation_changeset(struct \\ %__MODULE__{}, params) do
+    struct
+    |> cast(params, [:email, :locale, :given_name, :family_name])
+    |> validate_email()
+    |> validate_length(:given_name, max: 64)
+    |> validate_length(:family_name, max: 64)
+    |> put_change(:activated_at, DateTime.utc_now() |> DateTime.truncate(:second))
+  end
+
+  @doc """
   Changeset for User updates
   """
   @spec update_email_changeset(t() | Ecto.Changeset.data()) :: Ecto.Changeset.t(t)

@@ -3,6 +3,27 @@ defmodule KeilaWeb.AuthController do
   alias Keila.Auth
   require Keila
 
+  # `:login` stays open under OIDC-only: it renders the provider buttons with the
+  # password form hidden. `:post_login` is the actual authentication boundary.
+  plug :block_password_auth
+       when action in [
+              :post_login,
+              :register,
+              :post_register,
+              :reset,
+              :post_reset,
+              :reset_change_password,
+              :post_reset_change_password
+            ]
+
+  defp block_password_auth(conn, _opts) do
+    if Auth.Oidc.oidc_only?() do
+      conn |> render("oidc_only.html") |> halt()
+    else
+      conn
+    end
+  end
+
   @spec register(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def register(conn, _params) do
     if Application.get_env(:keila, :registration_disabled, false) do
@@ -120,7 +141,9 @@ defmodule KeilaWeb.AuthController do
       {:ok, %{email: email}} ->
         user = Auth.find_user_by_email(email)
 
-        if not is_nil(user) do
+        # An IdP-managed account must not mint a local password: it would outlive
+        # revocation at the IdP. The response is identical, so no account state leaks.
+        if not is_nil(user) and not Auth.Oidc.Login.idp_managed?(user.id) do
           Auth.send_password_reset_link(
             user.id,
             &Routes.auth_url(conn, :reset_change_password, &1)

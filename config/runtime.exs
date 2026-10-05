@@ -406,6 +406,122 @@ if config_env() == :prod do
   end
 end
 
+# OIDC SSO
+split_list = fn
+  value when value in [nil, ""] -> []
+  value -> value |> String.split([",", " ", "\t", "\n"], trim: true) |> Enum.reject(&(&1 == ""))
+end
+
+oidc_provider_names = System.get_env("KEILA_OIDC_PROVIDERS") |> split_list.()
+
+if oidc_provider_names != [] do
+  oidc_providers =
+    Enum.flat_map(oidc_provider_names, fn name ->
+      key = name |> String.downcase() |> String.to_atom()
+      prefix = "KEILA_OIDC_#{String.upcase(name)}_"
+
+      issuer = System.get_env(prefix <> "ISSUER")
+      client_id = System.get_env(prefix <> "CLIENT_ID")
+      client_secret = System.get_env(prefix <> "CLIENT_SECRET")
+
+      missing =
+        [{"ISSUER", issuer}, {"CLIENT_ID", client_id}, {"CLIENT_SECRET", client_secret}]
+        |> Enum.filter(fn {_, value} -> value in [nil, ""] end)
+        |> Enum.map(fn {suffix, _} -> prefix <> suffix end)
+
+      policy =
+        case System.get_env(prefix <> "POLICY", "entitlement") |> String.downcase() do
+          "entitlement" -> :entitlement
+          "tenant_spn" -> :tenant_spn
+          other -> {:unknown, other}
+        end
+
+      cond do
+        missing != [] ->
+          Logger.warning("""
+          OIDC provider "#{name}" is not configured and will be skipped.
+          Missing environment variables: #{Enum.join(missing, ", ")}
+          """)
+
+          []
+
+        match?({:unknown, _}, policy) ->
+          {:unknown, other} = policy
+
+          Logger.warning("""
+          OIDC provider "#{name}" has an unknown #{prefix}POLICY value "#{other}" and will be skipped.
+          Accepted values: entitlement, tenant_spn
+          """)
+
+          []
+
+        true ->
+          # An explicitly empty SCOPES must fall back to the default, not request no scopes:
+          # dropping `openid` turns the whole flow into a confusing token error.
+          scopes = System.get_env(prefix <> "SCOPES") |> split_list.()
+
+          opts =
+            [
+              issuer: issuer,
+              client_id: client_id,
+              client_secret: client_secret,
+              policy: policy
+            ]
+            |> then(fn opts ->
+              if scopes == [], do: opts, else: Keyword.put(opts, :scopes, scopes)
+            end)
+            |> put_if_not_empty.(:label, System.get_env(prefix <> "LABEL"))
+            |> put_if_not_empty.(
+              :entitlement_claim,
+              System.get_env(prefix <> "ENTITLEMENT_CLAIM")
+            )
+            |> put_if_not_empty.(
+              :entitlement_value,
+              System.get_env(prefix <> "ENTITLEMENT_VALUE")
+            )
+            |> put_if_not_empty.(:admin_value, System.get_env(prefix <> "ADMIN_VALUE"))
+            |> put_if_not_empty.(:tenant_prefix, System.get_env(prefix <> "TENANT_PREFIX"))
+            |> put_if_not_empty.(:tenant_claim, System.get_env(prefix <> "TENANT_CLAIM"))
+            |> put_if_not_empty.(:cacertfile, System.get_env(prefix <> "CACERTFILE"))
+
+          [{key, opts}]
+      end
+    end)
+
+  config :keila, Keila.Auth.Oidc,
+    providers: oidc_providers,
+    oidc_only: System.get_env("KEILA_OIDC_ONLY") not in [nil, "", "0", "false", "FALSE"]
+else
+  # Outside prod an unconfigured OIDC is the normal case, so the notice would be pure noise.
+  if config_env() == :prod do
+    Logger.warning("""
+    OIDC SSO not configured. Password authentication will be used.
+
+    To enable OIDC, set KEILA_OIDC_PROVIDERS to a space- or comma-separated
+    list of provider names, e.g. "staff merchant", and configure each provider
+    with the following environment variables (NAME is the upper-cased name):
+
+    - KEILA_OIDC_<NAME>_ISSUER (required)
+    - KEILA_OIDC_<NAME>_CLIENT_ID (required)
+    - KEILA_OIDC_<NAME>_CLIENT_SECRET (required)
+    - KEILA_OIDC_<NAME>_SCOPES (defaults to "openid email profile")
+    - KEILA_OIDC_<NAME>_LABEL (defaults to the capitalized provider name)
+    - KEILA_OIDC_<NAME>_POLICY ("entitlement" or "tenant_spn", defaults to "entitlement")
+    - KEILA_OIDC_<NAME>_ENTITLEMENT_CLAIM (for the entitlement policy)
+    - KEILA_OIDC_<NAME>_ENTITLEMENT_VALUE (for the entitlement policy)
+    - KEILA_OIDC_<NAME>_ADMIN_VALUE (entitlement policy: holders of this value on the
+      same claim gain Keila admin, reconciled on every sign-in)
+    - KEILA_OIDC_<NAME>_TENANT_PREFIX (for the tenant_spn policy)
+    - KEILA_OIDC_<NAME>_TENANT_CLAIM (for the tenant_spn policy, defaults to "groups")
+    - KEILA_OIDC_<NAME>_CACERTFILE (PEM to verify the IdP against, for a private CA;
+      it replaces the system trust store for this provider rather than adding to it)
+
+    Set KEILA_OIDC_ONLY to disable password login, registration and password
+    resets once at least one OIDC provider is configured.
+    """)
+  end
+end
+
 if config_env() == :test do
   db_url = System.get_env("DB_URL")
 

@@ -42,6 +42,10 @@ defmodule KeilaWeb.Router do
     post "/auth/reset", AuthController, :post_reset
     get "/auth/reset/:token", AuthController, :reset_change_password
     post "/auth/reset/:token", AuthController, :post_reset_change_password
+
+    get "/staff", OidcController, :staff
+    get "/auth/oidc/:provider", OidcController, :authorize
+    get "/auth/oidc/:provider/callback", OidcController, :callback
   end
 
   # Authenticated Routes without activation requirement

@@ -10,16 +10,27 @@ defmodule KeilaWeb.AccountController do
 
   @spec post_edit(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def post_edit(conn, %{"user" => %{"password" => password}}) do
-    params = %{password: password}
+    user = conn.assigns.current_user
 
-    case Auth.update_user_password(conn.assigns.current_user.id, params) do
-      {:ok, user} ->
-        conn
-        |> put_flash(:info, dgettext("auth", "New password saved."))
-        |> render_edit(change(user))
+    # A local password would outlive revocation at the IdP, so IdP-managed accounts get none.
+    if Auth.Oidc.Login.idp_managed?(user.id) do
+      conn
+      |> put_status(403)
+      |> put_flash(
+        :error,
+        dgettext("auth", "Your password is managed by your identity provider.")
+      )
+      |> render_edit(change(user))
+    else
+      case Auth.update_user_password(user.id, %{password: password}) do
+        {:ok, user} ->
+          conn
+          |> put_flash(:info, dgettext("auth", "New password saved."))
+          |> render_edit(change(user))
 
-      {:error, changeset} ->
-        render_edit(conn, changeset)
+        {:error, changeset} ->
+          render_edit(conn, changeset)
+      end
     end
   end
 
@@ -43,6 +54,7 @@ defmodule KeilaWeb.AccountController do
     |> assign(:changeset, changeset)
     |> assign(:account, account)
     |> assign(:credits, credits)
+    |> assign(:idp_managed, Auth.Oidc.Login.idp_managed?(conn.assigns.current_user.id))
     |> render("edit.html")
   end
 end

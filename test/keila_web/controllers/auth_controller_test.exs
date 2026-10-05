@@ -166,6 +166,30 @@ defmodule KeilaWeb.AuthControllerTest do
     end
 
     @tag :auth_controller
+    test "sends no email for an account the IdP manages", %{conn: conn} do
+      issuer = "https://idp.example.com/oauth2/openid/keila"
+      user = insert!(:user)
+      insert!(:oidc_identity, user_id: user.id, issuer: issuer)
+
+      previous = Application.get_env(:keila, Keila.Auth.Oidc)
+      on_exit(fn -> Application.put_env(:keila, Keila.Auth.Oidc, previous || []) end)
+
+      Application.put_env(:keila, Keila.Auth.Oidc,
+        providers: [staff: [issuer: issuer, client_id: "keila", client_secret: "s3cret"]]
+      )
+
+      conn =
+        post(conn, Routes.auth_path(conn, :reset),
+          user: %{email: user.email},
+          "h-captcha-response": @valid_hcaptcha
+        )
+
+      assert html_response(conn, 200) =~ ~r{Check your inbox!\s*</h1>}
+      refute_enqueued(worker: Keila.Auth.SystemMailerWorker)
+      assert_no_email_sent()
+    end
+
+    @tag :auth_controller
     test "shows error when not filled out", %{conn: conn} do
       conn =
         post(conn, Routes.auth_path(conn, :reset),

@@ -99,6 +99,10 @@ defmodule Keila.MixProject do
       {:mjml, "~> 5.0"},
       {:ex_cldr, "~> 2.44"},
       {:ex_cldr_territories, "~> 2.11"},
+      {:oidcc, "~> 3.8"},
+      # 0.5.1 hands oidcc an arity-1 capture where the refresh callback is arity 2,
+      # so an IdP signing-key rotation 500s every login. Fixed upstream, unreleased.
+      {:oidcc_plug, github: "erlef/oidcc_plug", branch: "main", override: true},
       {:lazy_html, ">= 0.0.0", only: :test}
     ]
   end

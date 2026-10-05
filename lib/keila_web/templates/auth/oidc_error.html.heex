@@ -1,0 +1,18 @@
+<div class="container mt-8">
+  <div class="rounded shadow p-8 mt-8 max-w-xl mx-auto flex flex-col gap-4 bg-gray-900 text-gray-50">
+    <h1 class="text-5xl font-bold">
+      {dgettext("auth", "Sign-in failed.")}
+    </h1>
+    <p class="text-lg text-gray-200">
+      {dgettext(
+        "auth",
+        "Your identity provider did not sign you in. Please contact an administrator if this keeps happening."
+      )}
+    </p>
+    <p>
+      <a href={Routes.auth_path(@conn, :login)} class="underline">
+        {dgettext("auth", "Back to sign-in.")}
+      </a>
+    </p>
+  </div>
+</div>

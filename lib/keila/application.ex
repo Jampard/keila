@@ -7,6 +7,10 @@ defmodule Keila.Application do
   @env Mix.env()
 
   def start(_type, _args) do
+    # oidcc calls the IdP via :httpc, which is IPv4-only by default and cannot reach an
+    # AAAA-only issuer; inet6fb4 tries IPv6 first and falls back to IPv4.
+    :httpc.set_options([ipfamily: :inet6fb4], :default)
+
     maybe_run_migrations()
 
     children =
@@ -30,7 +34,7 @@ defmodule Keila.Application do
           id: Keila.Id.Cache,
           start: {Agent, :start_link, [&Keila.Id.hashid_config/0, [name: Keila.Id.Cache]]}
         }
-      ] ++ scheduler_spec() ++ tz_updates_spec()
+      ] ++ scheduler_spec() ++ tz_updates_spec() ++ oidc_specs()
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
@@ -73,6 +77,10 @@ defmodule Keila.Application do
     else
       [{Tz.UpdatePeriodically, [interval_in_days: 7]}]
     end
+  end
+
+  defp oidc_specs() do
+    Keila.Auth.Oidc.child_specs()
   end
 
   defp maybe_fetch_updates() do

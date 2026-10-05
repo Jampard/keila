@@ -97,3 +97,22 @@ config :keila, Keila.Mailer, adapter: Swoosh.Adapters.Local
 
 # Enable sending quotas in dev
 config :keila, Keila.Accounts, credits_enabled: true
+
+# ## OIDC SSO
+#
+# OIDC is off by default. To try it out in development, uncomment and adapt:
+#
+#     config :keila, Keila.Auth.Oidc,
+#       providers: [
+#         staff: [
+#           issuer: "https://idp.example.com/oauth2/openid/keila",
+#           client_id: "keila",
+#           client_secret: "s3cret",
+#           scopes: ["openid", "email", "profile", "groups"],
+#           label: "Sign in with Staff SSO",
+#           policy: :entitlement,
+#           entitlement_claim: "keila_role",
+#           entitlement_value: "keila_users"
+#         ]
+#       ],
+#       oidc_only: false
