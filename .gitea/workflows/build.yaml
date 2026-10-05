@@ -1,0 +1,86 @@
+name: Test and Build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# devenv's postgres and kanidm bind fixed ports on a shared runner, so runs must not overlap.
+concurrency:
+  group: keila-ci
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ${{ vars.REGISTRY }}
+  IMAGE: ${{ vars.REGISTRY }}/${{ vars.IMAGE_NAME }}
+  NIX: /run/current-system/sw/bin/nix
+  HOME: /var/lib/gitea-runner
+
+jobs:
+  # The suite drives a real kanidm, so CI boots the same devenv stack used locally.
+  test:
+    runs-on: native
+    steps:
+      - uses: actions/checkout@v4
+
+      # devenv execs a bare `nix`; without this it resolves to the repo's nix/ directory.
+      - name: Put nix on PATH for devenv's own internal nix calls
+        run: echo "/run/current-system/sw/bin" >> "$GITHUB_PATH"
+
+      - name: Clear any devenv processes left running from a previous run
+        run: $NIX develop . --no-pure-eval --command process-compose down 2>/dev/null || true
+
+      - name: mix deps.get, compile --warnings-as-errors, format check
+        run: |
+          $NIX develop . --no-pure-eval --command bash -c '
+            set -euo pipefail
+            mix local.hex --force
+            mix local.rebar --force
+            mix deps.get
+            mix compile --warnings-as-errors
+            mix format --check-formatted
+          '
+
+      - name: Start devenv processes (postgres + kanidm + realm provisioning), detached
+        run: $NIX develop . --no-pure-eval --command devenv up -D
+
+      - name: Wait for the realm to be provisioned (kanidm-provision is a one-shot)
+        run: |
+          set -euo pipefail
+          ready=".devenv/state/kanidm/keila.env"
+          for _ in $(seq 1 60); do
+            [ -f "$ready" ] && { echo "realm ready: $ready"; exit 0; }
+            sleep 2
+          done
+          echo "$ready never appeared after 120s — kanidm-provision did not finish"
+          $NIX develop . --no-pure-eval --command process-compose down || true
+          exit 1
+
+      # Do not source keila.env here: the app would start its own OIDC supervisor and
+      # collide with the ones the tests start.
+      - name: mix test
+        run: $NIX develop . --no-pure-eval --command mix test
+
+      - name: Stop devenv processes
+        if: always()
+        run: $NIX develop . --no-pure-eval --command process-compose down || true
+
+  build:
+    runs-on: native
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      # Registry credentials come from the runner's REGISTRY_AUTH_FILE.
+      - name: Build image
+        run: |
+          podman build \
+            --progress=plain \
+            -f ops/Dockerfile \
+            -t $IMAGE:${{ github.ref_name }} \
+            -t $IMAGE:${{ github.sha }} .
+
+      - name: Push image
+        run: |
+          podman push $IMAGE:${{ github.ref_name }}
+          podman push $IMAGE:${{ github.sha }}
