@@ -5,7 +5,6 @@ defmodule KeilaWeb.SourceLinkTest do
   @upstream "https://github.com/pentacent/keila"
 
   setup do
-    with_seed()
     previous = Application.get_env(:keila, KeilaWeb.SourceLink)
 
     on_exit(fn ->
@@ -45,6 +44,7 @@ defmodule KeilaWeb.SourceLinkTest do
 
   @tag :source_link
   test "the login page links the running revision", %{conn: conn} do
+    with_seed()
     put_source(url: "https://example.com/keila", revision: "abc123")
 
     html = conn |> get(Routes.auth_path(conn, :login)) |> html_response(200)
@@ -54,6 +54,7 @@ defmodule KeilaWeb.SourceLinkTest do
 
   @tag :source_link
   test "the login page links upstream when unconfigured", %{conn: conn} do
+    with_seed()
     put_source([])
 
     html = conn |> get(Routes.auth_path(conn, :login)) |> html_response(200)
