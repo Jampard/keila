@@ -13,6 +13,7 @@ concurrency:
 env:
   REGISTRY: ${{ vars.REGISTRY }}
   IMAGE: ${{ vars.REGISTRY }}/${{ vars.IMAGE_NAME }}
+  REGISTRY_TLS_VERIFY: ${{ vars.REGISTRY_TLS_VERIFY || 'true' }}
   NIX: /run/current-system/sw/bin/nix
   HOME: /var/lib/gitea-runner
 
@@ -84,5 +85,5 @@ jobs:
 
       - name: Push image
         run: |
-          podman push $IMAGE:${{ github.ref_name }}
-          podman push $IMAGE:${{ github.sha }}
+          podman push --tls-verify=$REGISTRY_TLS_VERIFY $IMAGE:${{ github.ref_name }}
+          podman push --tls-verify=$REGISTRY_TLS_VERIFY $IMAGE:${{ github.sha }}
