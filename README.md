@@ -9,6 +9,15 @@
 
 # ![The Keila logo is a stylized elephant](.github/assets/logo.svg) Keila - An Open Source Newsletter Tool
 
+## About this fork
+
+This is a modified version of Keila maintained by EklipseTech. It adds
+optional OpenID Connect single sign-on (see [docs/oidc-sso.md](docs/oidc-sso.md))
+and links the source of the running version on every page of the web
+interface. See
+[NOTICE](NOTICE) for the full list of changes; everything below is
+upstream's README.
+
 Keila is an Open Source alternative to newsletter tools like Mailchimp or
 Sendinblue.
 

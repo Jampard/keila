@@ -1,0 +1,24 @@
+This is a modified version of Keila.
+
+Keila is Copyright Pentacent (Philipp Schmieder) and licensed under the
+GNU Affero General Public License, version 3 (see LICENSE.md).
+Upstream source: https://github.com/pentacent/keila
+
+Modified by EklipseTech, August 2026 to October 2026. The modifications
+are licensed under the same terms (AGPL-3.0).
+
+Changes from upstream:
+
+- OpenID Connect single sign-on: optional sign-in through one or more
+  OIDC providers, with entitlement- and tenant-based access policies and
+  an OIDC-only mode. See docs/oidc-sso.md.
+- Build and CI: a nix/devenv development environment with a local kanidm
+  identity provider (flake.nix, nix/), a CI workflow (.gitea/workflows/)
+  and a hardened container image (ops/Dockerfile).
+- Source link: every page of the web interface links the source code of
+  the running version (KEILA_SOURCE_URL, KEILA_SOURCE_REVISION), as
+  required by section 13 of the AGPL.
+
+The extra/ directory is upstream's Keila Cloud code. It is not licensed
+under the AGPL (see extra/README.md), is left untouched by this fork and
+is not compiled into its builds.
