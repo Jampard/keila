@@ -39,7 +39,7 @@
         beam = pkgs.beam27Packages;
 
         # Off 5432/8443/8444 and below platform's 8600+ worktree lattice: shared CI runners host both.
-        # dev.exs takes the port via PGPORT (Postgrex), the test env via DB_URL (runtime.exs).
+        # dev.exs gets the port via the PGPORT devenv exports (Postgrex reads it); tests via DB_URL.
         ports = {
           postgres = 7432;
           kanidm = 7443;
@@ -65,7 +65,6 @@
               ];
 
               env = {
-                PGPORT = toString ports.postgres;
                 DB_URL = "ecto://postgres:postgres@localhost:${toString ports.postgres}/keila_test";
                 KEILA_KANIDM_URL = issuer;
                 KEILA_ORIGIN = origin;
