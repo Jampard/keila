@@ -32,6 +32,7 @@ RUN apk add --no-cache openssl curl
 RUN mkdir -p ${HOME} && \
     adduser -s /bin/sh -u 1001 -G root -h ${HOME} -S -D default && \
     chown -R 1001:0 ${HOME}
+USER 1001
 ARG KEILA_SOURCE_URL
 LABEL org.eklipse.secret-files=1
 ARG KEILA_SOURCE_REVISION
