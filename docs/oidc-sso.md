@@ -50,26 +50,26 @@ internal provider key) has its own set of `KEILA_OIDC_<NAME>_*` variables.
 | `KEILA_OIDC_<NAME>_CLIENT_SECRET` | yes | — | provider skipped if missing; `…_CLIENT_SECRET_FILE` reads it from a file |
 | `KEILA_OIDC_<NAME>_SCOPES` | no | `openid email profile` | space/comma/tab/newline-separated; if set but empty, falls back to the default rather than requesting no scopes |
 | `KEILA_OIDC_<NAME>_LABEL` | no | the provider name, capitalized (e.g. `staff` → `Staff`) | |
-| `KEILA_OIDC_<NAME>_POLICY` | no | `entitlement` | `entitlement` or `tenant_spn`, case-insensitive; **any other value skips the whole provider**, it does not fall back to the default |
+| `KEILA_OIDC_<NAME>_POLICY` | no | `entitlement` | `entitlement` or `pushed`, case-insensitive; **any other value (including the removed `tenant_spn`) refuses boot** |
 | `KEILA_OIDC_<NAME>_ENTITLEMENT_CLAIM` | for the `entitlement` policy | unset | see Policies below — unset means nobody can sign in via this provider |
 | `KEILA_OIDC_<NAME>_ENTITLEMENT_VALUE` | for the `entitlement` policy | unset | see Policies below — unset means nobody can sign in via this provider |
 | `KEILA_OIDC_<NAME>_ADMIN_VALUE` | no | unset (no OIDC user gains admin) | `entitlement` policy only — see Administrators below |
-| `KEILA_OIDC_<NAME>_TENANT_PREFIX` | for the `tenant_spn` policy | unset | see Policies below — unset means nobody can sign in via this provider |
-| `KEILA_OIDC_<NAME>_TENANT_CLAIM` | no | `groups` | see Policies below |
+| `KEILA_OIDC_<NAME>_TENANT_PREFIX`, `…_TENANT_CLAIM` | must be unset | — | leftovers of the removed `tenant_spn` policy; **either one refuses boot** |
 | `KEILA_OIDC_<NAME>_CACERTFILE` | for an IdP behind a private CA | unset (system trust store) | PEM path — see Private certificate authorities below |
+| `KEILA_TENANCY_SECRET` | to accept the tenancy push | unset (`/tenancy*` answers 404) | bearer secret; `KEILA_TENANCY_SECRET_FILE` reads it from a file — see Tenancy push below |
 | `KEILA_OIDC_ONLY` | no | off | any value other than unset, empty, `0`, `false` or `FALSE` turns it on (so `False`, `no`, `1`, `true` all turn it on) — see OIDC-only mode below |
 
 The variables are parsed in the OIDC SSO block of `config/runtime.exs`; the
-defaults are `@default_scopes`, `@default_policy`, `@default_tenant_claim`
-and `default_label/1` in `Keila.Auth.Oidc` (`lib/keila/auth/oidc.ex`).
+defaults are `@default_scopes`, `@default_policy` and `default_label/1` in `Keila.Auth.Oidc` (`lib/keila/auth/oidc.ex`).
 
 ### Incomplete configuration
 
 If any of `ISSUER`, `CLIENT_ID` or `CLIENT_SECRET` is missing (or empty) for
 a provider name listed in `KEILA_OIDC_PROVIDERS`, that provider is dropped
 entirely: a boot-time warning names the specific missing variables, and
-**every other configured provider still starts normally**. The same applies
-to an unrecognized `_POLICY` value. There is no partial state for a single
+**every other configured provider still starts normally**. An unrecognized
+`_POLICY` value is different: it refuses boot, so a stale configuration fails
+the deploy instead of running without its provider. There is no partial state for a single
 provider — it is either fully valid or entirely absent from
 `Keila.Auth.Oidc.providers/0`.
 
@@ -92,13 +92,11 @@ KEILA_OIDC_MERCHANT_CLIENT_ID=keila-merchant
 KEILA_OIDC_MERCHANT_CLIENT_SECRET=s3cret-merchant
 KEILA_OIDC_MERCHANT_SCOPES="openid email profile groups"
 KEILA_OIDC_MERCHANT_LABEL="Sign in with your organization"
-KEILA_OIDC_MERCHANT_POLICY=tenant_spn
-KEILA_OIDC_MERCHANT_TENANT_PREFIX=keila
-KEILA_OIDC_MERCHANT_TENANT_CLAIM=groups
+KEILA_OIDC_MERCHANT_POLICY=pushed
 ```
 
 This produces two independent providers, `staff` (entitlement-gated) and
-`merchant` (tenant-mapped), each reachable at its own callback path (see
+`merchant` (admitting only the people the platform pushed), each reachable at its own callback path (see
 Setting up kanidm below). Only `merchant` gets a button — `staff` is reached
 at `/staff`, per the section above.
 
@@ -156,29 +154,45 @@ already linked but no longer carries the required claim value is refused on
 their next login. Removing someone from the group at the IdP revokes their
 Keila access on their next sign-in attempt.
 
-### `tenant_spn`
+### `pushed`
 
-Parses entries of the form `<prefix>.<slug>.<role>` (optionally suffixed
-`@domain`, which is stripped and ignored) out of the claim named by
-`KEILA_OIDC_<NAME>_TENANT_CLAIM` (default `groups`). `<prefix>` must equal
-`KEILA_OIDC_<NAME>_TENANT_PREFIX` exactly; `<slug>` and `<role>` must both be
-non-empty. Entries that don't match this shape (wrong prefix, wrong number
-of dot-separated segments, empty slug or role) are silently skipped — they
-do not error, they just don't grant anything. The `<role>` segment is
-parsed but not currently used to differentiate access level; every matching
-entry grants membership in one Keila project keyed on the tenant slug.
+The provider admits only people the platform has pushed (see Tenancy push
+below). Sign-in finds the User by `{issuer, sub}` and refuses anyone without
+that identity row (`:not_entitled`); it never provisions, never reads the
+email claim and never grants anything. Which projects a person reaches is
+decided by the push alone. At most one provider may carry this policy: with
+none or several, the tenancy push answers 503.
 
-If `_TENANT_PREFIX` is not set, **nobody can sign in through that
-provider** for the same reason as above.
+## Tenancy push
 
-Each sign-in **reconciles** tenant membership: the current claim is taken
-as authoritative, so slugs no longer present are revoked and new slugs are
-granted, in the same request. Reconciliation only ever touches Keila
-projects that were themselves created via this tenant mapping for that
-issuer — a project the user owns outright, joined manually, or holds via a
-different issuer's mapping is left alone
-(`Keila.Auth.Oidc.Tenants.list_user_tenants/2` scopes strictly to
-`{issuer, slug}` rows in `oidc_tenants`).
+With `KEILA_TENANCY_SECRET` set, Keila implements the platform's tenancy
+contract v1 on the app port:
+
+| Route | Answer |
+|---|---|
+| `PUT /tenancy/{slug}` | `{version, state, name, domains[], members[{sub, mail, role}]}` → 200 `{applied: true}` or `{ignored: true}` |
+| `GET /tenancy/{slug}` | `{version, state, members[{sub, role}]}`, or 404 when unknown or purged |
+| `GET /tenancy` | `[{slug, version}]` of every shop not purged |
+
+Every route needs `Authorization: Bearer <secret>` (401 `{"error":"unauthorised"}`
+otherwise). A malformed body, including one that is not JSON, is 422
+`{"error": "<field>: <why>"}` and applies nothing. A version at or below the
+last one applied for the slug is ignored. The route must never be on a public
+vhost.
+
+Each slug is one shop: an Account, a Project group under it and a Project
+named after `name`, recorded in the `tenancies` table. Members join the
+Project group only — never the Account group, never a role — so a send from
+the project debits that shop's Account alone. A member is matched by
+`{pushed issuer, sub}`; a new sub becomes a password-less User and the push
+owns its email (a mail held by another User is 422).
+
+- `live`: the pushed members hold the project; anyone the push dropped loses it.
+- `suspended`: the data stays, every pushed member loses access.
+- `purged`: the Account and its group are deleted, which cascades to the
+  Project and its data. Users are never deleted. The row stays as a
+  tombstone at that version, so a later push only re-creates the shop fresh
+  with a higher version.
 
 ## OIDC-only mode
 
@@ -222,7 +236,7 @@ sign-in, both ways** — leaving the admin group at the IdP revokes
 `administer_keila` at that user's next login. A provider configuring
 `ADMIN_VALUE` therefore owns root-role membership for every user who signs
 in through it, including a grant made by hand; with the variable unset, no
-grant is ever made *or removed*. It has no effect on a `tenant_spn`
+grant is ever made *or removed*. It has no effect on a `pushed`
 provider.
 
 `KEILA_PASSWORD` is authoritative on **every boot**, not only at first
@@ -264,13 +278,12 @@ Refusals an operator might see in the logs
 | Reason | When |
 |---|---|
 | `:invalid_claims` | `iss` or `sub` missing/empty in the token claims |
-| `:provisioning_disabled` | the provider's gate (`_ENTITLEMENT_CLAIM` or `_TENANT_PREFIX`) is unset |
-| `:not_entitled` | the entitlement check failed, or no tenant slugs matched |
+| `:provisioning_disabled` | the provider's gate (`_ENTITLEMENT_CLAIM` / `_ENTITLEMENT_VALUE`) is unset |
+| `:not_entitled` | the entitlement check failed, or a `pushed` provider was never pushed this `sub` |
 | `:missing_email` | no `email` claim on first sign-in (no existing identity to fall back to) |
 | `:email_not_verified` | `email_verified` claim is explicitly `false` |
 | `:email_exists` | the claimed email already belongs to a different Keila account |
 | `:provisioning_failed` | user/identity row could not be created and no concurrent winner was found either |
-| `:tenant_sync_failed` | tenant reconciliation failed after a successful sign-in (`tenant_spn` policy only) |
 | `:unknown_provider` | the `:provider` in the request does not match a currently valid, enabled provider |
 
 A user who is already linked (existing `oidc_identities` row) skips the
@@ -290,8 +303,8 @@ CLI invocations that were not verified against a running instance.
    resolves the provider from the `:provider` path parameter).
 3. **Scope map**: must include `openid` (Keila's default scope list is
    `openid email profile`; add `groups` if you intend to use either
-   policy's claim-based gating, since neither `entitlement_claim` nor
-   `tenant_claim` is populated by the default scopes alone).
+   entitlement policy's claim-based gating, since `entitlement_claim` is
+   not populated by the default scopes alone).
 4. **Claim map for the `entitlement` policy**: map a claim (e.g.
    `keila_role`) to the group(s) that should be allowed to sign in, and set
    `KEILA_OIDC_<NAME>_ENTITLEMENT_CLAIM=keila_role` and
@@ -301,7 +314,7 @@ CLI invocations that were not verified against a running instance.
 every group a user belongs to, all in one flat list claim. That claim is
 heterogeneous by design — `Keila.Auth.Oidc.Claims` only pattern-matches
 strings that fit the shape it expects (a single required string for
-`entitlement`, or `<prefix>.<slug>.<role>` for `tenant_spn`); anything else
+`entitlement`); anything else
 in the list, including the UUID entries, is silently skipped rather than
 causing an error.
 
@@ -320,8 +333,9 @@ layer of protection those plugs are relying on being present.
 
 **Provider skipped at boot.** Check the application log at startup for
 `OIDC provider "<name>" is not configured and will be skipped` (missing
-`ISSUER`/`CLIENT_ID`/`CLIENT_SECRET` — the message names which) or `has an
-unknown ..._POLICY value "..."`. Other providers are unaffected.
+`ISSUER`/`CLIENT_ID`/`CLIENT_SECRET` — the message names which). Other
+providers are unaffected. An unknown `_POLICY` or a leftover `_TENANT_*`
+variable does not skip: it stops the boot, naming the variable.
 
 **404 on the sign-in route for a provider.** The provider name in the URL
 doesn't match a currently valid, enabled provider — either it isn't in
@@ -336,7 +350,8 @@ account already exists under a different login path and needs manual
 reconciliation, not a config change.
 
 **Everyone is refused on one provider.** Most likely
-`:provisioning_disabled` (an entitlement/tenant gate that's misconfigured
-or unset) or a scope map on the IdP side that isn't actually including the
-claim Keila is asking for (`_ENTITLEMENT_CLAIM` / `_TENANT_CLAIM`) — check
+`:provisioning_disabled` (an entitlement gate that's misconfigured or
+unset), a `pushed` provider whose people were never pushed, or a scope map
+on the IdP side that isn't actually including the claim Keila is asking for
+(`_ENTITLEMENT_CLAIM`) — check
 the ID token contents against what the configured claim name expects.

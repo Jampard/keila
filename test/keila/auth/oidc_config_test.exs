@@ -18,8 +18,7 @@ defmodule Keila.Auth.OidcConfigTest do
     issuer: "https://shop.example.com/oidc",
     client_id: "keila-merchant",
     client_secret: "sh0p",
-    policy: :tenant_spn,
-    tenant_prefix: "org"
+    policy: :pushed
   ]
 
   setup do
@@ -57,7 +56,6 @@ defmodule Keila.Auth.OidcConfigTest do
     assert Oidc.policy(:staff) == nil
     assert Oidc.entitlement_claim(:staff) == nil
     assert Oidc.entitlement_value(:staff) == nil
-    assert Oidc.tenant_prefix(:staff) == nil
     assert Oidc.provider_worker_name(:staff) == nil
   end
 
@@ -91,7 +89,6 @@ defmodule Keila.Auth.OidcConfigTest do
     assert Oidc.policy("staff") == :entitlement
     assert Oidc.entitlement_claim("staff") == "keila_role"
     assert Oidc.entitlement_value("staff") == "keila_users"
-    assert Oidc.tenant_prefix("staff") == nil
   end
 
   @tag :oidc
@@ -153,17 +150,6 @@ defmodule Keila.Auth.OidcConfigTest do
   end
 
   @tag :oidc
-  test "tenant_claim defaults to the kanidm groups claim" do
-    put_config(providers: [merchant: @merchant])
-
-    assert Oidc.tenant_claim(:merchant) == "groups"
-    assert Oidc.tenant_claim(:unconfigured) == nil
-
-    put_config(providers: [merchant: Keyword.put(@merchant, :tenant_claim, "roles")])
-    assert Oidc.tenant_claim(:merchant) == "roles"
-  end
-
-  @tag :oidc
   test "empty scopes fall back to the defaults so openid is never dropped" do
     put_config(providers: [staff: Keyword.put(@staff, :scopes, [])])
 
@@ -183,8 +169,7 @@ defmodule Keila.Auth.OidcConfigTest do
     put_config(providers: [staff: @staff, merchant: @merchant])
 
     assert Oidc.provider_names() == [:staff, :merchant]
-    assert Oidc.policy(:merchant) == :tenant_spn
-    assert Oidc.tenant_prefix(:merchant) == "org"
+    assert Oidc.policy(:merchant) == :pushed
 
     assert Oidc.provider_worker_name(:staff) != Oidc.provider_worker_name(:merchant)
     assert Oidc.provider_worker_name("staff") == Oidc.provider_worker_name(:staff)
@@ -312,6 +297,40 @@ defmodule Keila.Auth.OidcConfigTest do
       assert Oidc.cacertfile(:staff) == nil
       assert Oidc.request_opts(:staff) == %{}
       assert Oidc.provider_configuration_opts(:staff) == nil
+    end
+  end
+
+  @tag :oidc
+  test "a tenant_spn policy is no longer valid, so such a provider is dropped" do
+    put_config(providers: [merchant: Keyword.put(@merchant, :policy, :tenant_spn)])
+
+    assert Oidc.provider_names() == []
+  end
+
+  @tag :oidc
+  test "boot refuses tenant_spn and any unknown policy, naming the variable" do
+    assert Oidc.parse_policy!("merchant", "pushed") == :pushed
+    assert Oidc.parse_policy!("staff", nil) == :entitlement
+
+    assert_raise ArgumentError, ~r/KEILA_OIDC_MERCHANT_POLICY=tenant_spn/, fn ->
+      Oidc.refuse_stale_config!(%{"KEILA_OIDC_MERCHANT_POLICY" => "tenant_spn"})
+    end
+
+    assert_raise ArgumentError, ~r/KEILA_OIDC_STAFF_POLICY=open/, fn ->
+      Oidc.refuse_stale_config!(%{"KEILA_OIDC_STAFF_POLICY" => "open"})
+    end
+  end
+
+  @tag :oidc
+  test "boot refuses while a tenant_spn-era variable is still set" do
+    assert :ok = Oidc.refuse_stale_config!(%{"KEILA_OIDC_MERCHANT_POLICY" => "pushed"})
+
+    assert_raise ArgumentError, ~r/KEILA_OIDC_MERCHANT_TENANT_PREFIX/, fn ->
+      Oidc.refuse_stale_config!(%{"KEILA_OIDC_MERCHANT_TENANT_PREFIX" => "org"})
+    end
+
+    assert_raise ArgumentError, ~r/KEILA_OIDC_MERCHANT_TENANT_CLAIM/, fn ->
+      Oidc.refuse_stale_config!(%{"KEILA_OIDC_MERCHANT_TENANT_CLAIM" => "groups"})
     end
   end
 end

@@ -48,21 +48,22 @@ defmodule KeilaWeb.OidcControllerTest do
   defp callback_url(provider \\ "merchant"),
     do: Routes.oidc_url(KeilaWeb.Endpoint, :callback, provider)
 
-  # A tenant member: one `<prefix>.<slug>.<role>` group is what `tenant_spn` grants on.
+  # A shop member: the platform pushes the person's kanidm uuid into each of `slugs`.
   defp provision_member(kanidm, admin, opts \\ []) do
     person = KanidmIssuer.unique("member")
-    slug = Keyword.get_lazy(opts, :slug, fn -> KanidmIssuer.unique("acme") end)
+    slugs = Keyword.get_lazy(opts, :slugs, fn -> [KanidmIssuer.unique("acme")] end)
+    mail = "#{person}@example.test"
 
-    groups =
-      Keyword.get(opts, :groups, ["#{kanidm.tenant_prefix}.#{slug}.admin"])
+    KanidmIssuer.provision_person!(kanidm, admin, person, password: @password, mail: mail)
+    sub = KanidmIssuer.person_uuid!(kanidm, admin, person)
+    Enum.each(slugs, &push_shop(&1, 1, [%{sub: sub, mail: mail, role: "merchant"}]))
 
-    KanidmIssuer.provision_person!(kanidm, admin, person,
-      password: @password,
-      mail: "#{person}@example.test",
-      groups: groups
-    )
+    %{person: person, slug: List.first(slugs), sub: sub, mail: mail}
+  end
 
-    %{person: person, slug: slug}
+  defp push_shop(slug, version, members) do
+    state = %{version: version, state: "live", name: slug, domains: [], members: members}
+    {:ok, :applied} = Keila.Tenancy.apply_state(slug, state)
   end
 
   defp configure(providers) do
@@ -73,6 +74,14 @@ defmodule KeilaWeb.OidcControllerTest do
   defp configure_merchant(kanidm, admin, overrides \\ []) do
     KanidmIssuer.allow_redirect_uri!(kanidm, admin, callback_url())
     configure(merchant: KanidmIssuer.provider_opts(kanidm, overrides))
+  end
+
+  defp entitlement_opts(kanidm) do
+    KanidmIssuer.provider_opts(kanidm,
+      policy: :entitlement,
+      entitlement_claim: "groups",
+      entitlement_value: "keila_nobody"
+    )
   end
 
   defp request_authorize(conn, provider),
@@ -145,7 +154,7 @@ defmodule KeilaWeb.OidcControllerTest do
   end
 
   @tag :oidc
-  test "a full code flow signs in a tenant member and links the identity", %{
+  test "a full code flow signs in a pushed member as the User the push created", %{
     conn: conn,
     kanidm: kanidm,
     admin: admin
@@ -171,7 +180,7 @@ defmodule KeilaWeb.OidcControllerTest do
   end
 
   @tag :oidc
-  test "signing in twice with the same subject reuses the provisioned user", %{
+  test "signing in twice writes no user or identity: the push already did", %{
     conn: conn,
     kanidm: kanidm,
     admin: admin
@@ -184,7 +193,7 @@ defmodule KeilaWeb.OidcControllerTest do
     assert conn |> complete_login(kanidm, "merchant", person) |> redirected_to(302)
     assert build_conn() |> complete_login(kanidm, "merchant", person) |> redirected_to(302)
 
-    assert counts() == %{users: before.users + 1, identities: before.identities + 1}
+    assert counts() == before
   end
 
   @tag :oidc
@@ -223,13 +232,13 @@ defmodule KeilaWeb.OidcControllerTest do
   end
 
   @tag :oidc
-  test "a subject holding no tenant group is refused and no user is written", %{
+  test "a subject never pushed is refused and no user is written", %{
     conn: conn,
     kanidm: kanidm,
     admin: admin
   } do
     configure_merchant(kanidm, admin)
-    %{person: person} = provision_member(kanidm, admin, groups: [])
+    %{person: person} = provision_member(kanidm, admin, slugs: [])
 
     before = counts()
     conn = complete_login(conn, kanidm, "merchant", person)
@@ -240,7 +249,7 @@ defmodule KeilaWeb.OidcControllerTest do
   end
 
   @tag :oidc
-  test "dropping one of two tenant groups revokes that project and keeps the other", %{
+  test "a newer push without the member revokes that shop and keeps the other", %{
     conn: conn,
     kanidm: kanidm,
     admin: admin
@@ -249,65 +258,20 @@ defmodule KeilaWeb.OidcControllerTest do
 
     kept = KanidmIssuer.unique("kept")
     dropped = KanidmIssuer.unique("dropped")
-
-    %{person: person} =
-      provision_member(kanidm, admin,
-        groups: [
-          "#{kanidm.tenant_prefix}.#{kept}.admin",
-          "#{kanidm.tenant_prefix}.#{dropped}.admin"
-        ]
-      )
+    %{person: person} = provision_member(kanidm, admin, slugs: [kept, dropped])
 
     conn = complete_login(conn, kanidm, "merchant", person)
     assert get_session(conn, :token)
     user = Repo.get_by(User, email: "#{person}@example.test")
     assert MapSet.subset?(MapSet.new([kept, dropped]), MapSet.new(project_names(user.id)))
 
-    KanidmIssuer.remove_from_group!(
-      kanidm,
-      admin,
-      person,
-      "#{kanidm.tenant_prefix}.#{dropped}.admin"
-    )
+    push_shop(dropped, 2, [])
 
-    # Reconciliation runs on every sign-in, so the withdrawn grant goes with it.
     assert build_conn() |> complete_login(kanidm, "merchant", person) |> get_session(:token)
 
     names = project_names(user.id)
     assert kept in names
     refute dropped in names
-  end
-
-  # Documents a real asymmetry rather than an intended design: the entitlement gate runs
-  # BEFORE `sync/4`, so losing the LAST tenant group refuses the sign-in and reconciliation
-  # never runs. Keila access is therefore not withdrawn — it is only made unreachable via
-  # OIDC. Anything else holding a session keeps the project.
-  @tag :oidc
-  test "losing the last tenant group refuses sign-in but leaves the project in place", %{
-    conn: conn,
-    kanidm: kanidm,
-    admin: admin
-  } do
-    configure_merchant(kanidm, admin)
-    %{person: person, slug: slug} = provision_member(kanidm, admin)
-
-    conn = complete_login(conn, kanidm, "merchant", person)
-    assert get_session(conn, :token)
-    user = Repo.get_by(User, email: "#{person}@example.test")
-    assert slug in project_names(user.id)
-
-    KanidmIssuer.remove_from_group!(
-      kanidm,
-      admin,
-      person,
-      "#{kanidm.tenant_prefix}.#{slug}.admin"
-    )
-
-    conn = complete_login(build_conn(), kanidm, "merchant", person)
-
-    assert html_response(conn, 403)
-    refute get_session(conn, :token)
-    assert slug in project_names(user.id)
   end
 
   @tag :oidc
@@ -326,10 +290,7 @@ defmodule KeilaWeb.OidcControllerTest do
 
     KanidmIssuer.allow_redirect_uri!(kanidm, admin, callback_url())
 
-    configure(
-      merchant: KanidmIssuer.provider_opts(kanidm),
-      second: KanidmIssuer.provider_opts(second)
-    )
+    configure(merchant: KanidmIssuer.provider_opts(kanidm), second: entitlement_opts(second))
 
     %{person: person} = provision_member(kanidm, admin)
 
@@ -339,8 +300,7 @@ defmodule KeilaWeb.OidcControllerTest do
     second_conn = complete_login(build_conn(), second, "second", person)
 
     # Same human, same kanidm uuid, but a different issuer — so a different identity
-    # namespace. The second sign-in cannot reuse the first user, and the shared email
-    # blocks provisioning rather than silently linking.
+    # namespace: the second sign-in cannot reuse the first user.
     assert html_response(second_conn, 403)
     refute get_session(second_conn, :token)
     assert Repo.aggregate(OidcIdentity, :count) == 1
@@ -362,10 +322,7 @@ defmodule KeilaWeb.OidcControllerTest do
 
     KanidmIssuer.allow_redirect_uri!(kanidm, admin, callback_url())
 
-    configure(
-      merchant: KanidmIssuer.provider_opts(kanidm),
-      second: KanidmIssuer.provider_opts(second)
-    )
+    configure(merchant: KanidmIssuer.provider_opts(kanidm), second: entitlement_opts(second))
 
     %{person: person} = provision_member(kanidm, admin)
 

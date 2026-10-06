@@ -1,9 +1,8 @@
 {
-  description = "Keila development environment: Elixir, PostgreSQL and a local kanidm for OIDC SSO";
+  description = "Keila: the deployed image (packages.<linux>.image) and a dev environment with PostgreSQL and kanidm";
 
   inputs = {
-    clan-core.url = "git+https://git.clan.lol/clan/clan-core.git";
-    nixpkgs.follows = "clan-core/nixpkgs";
+    nixpkgs.url = "github:NixOS/nixpkgs/f4b6996c4e8b9ee06ce147ec344c885f51071b14";
     flake-utils.url = "github:numtide/flake-utils";
     systems.url = "github:nix-systems/default";
 
@@ -26,6 +25,7 @@
 
   outputs =
     {
+      self,
       nixpkgs,
       flake-utils,
       systems,
@@ -39,7 +39,6 @@
         beam = pkgs.beam27Packages;
 
         # Off 5432/8443/8444 and below platform's 8600+ worktree lattice: shared CI runners host both.
-        # dev.exs gets the port via the PGPORT devenv exports (Postgrex reads it); tests via DB_URL.
         ports = {
           postgres = 7432;
           kanidm = 7443;
@@ -49,8 +48,18 @@
         kanidmPkg = pkgs.kanidm_1_11;
         origin = "http://localhost:${toString ports.keila}";
         issuer = "https://localhost:${toString ports.kanidm}";
+        image = import ./nix/image.nix {
+          inherit pkgs beam;
+          sourceUrl = "https://github.com/Jampard/keila";
+          revision = self.rev or null;
+        };
       in
       {
+        packages = nixpkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
+          inherit (image) keila image;
+          default = image.image;
+        };
+
         devShells.default = devenv.lib.mkShell {
           inherit inputs pkgs;
           modules = [

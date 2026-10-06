@@ -32,6 +32,7 @@ config :keila, Keila.Files.StorageAdapters.Local,
 
 config :esbuild,
   version: "0.17.11",
+  path: System.get_env("MIX_ESBUILD_PATH"),
   default: [
     args: ~w(js/app.js --bundle --target=es2016 --outdir=../priv/static/js),
     cd: Path.expand("../assets", __DIR__),

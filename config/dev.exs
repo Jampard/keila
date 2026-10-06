@@ -6,6 +6,8 @@ config :keila, Keila.Repo,
   password: "postgres",
   database: "keila_dev",
   hostname: "localhost",
+  # ecto_sql defaults :port to 5432 before Postgrex would read PGPORT, so devenv's port is passed explicitly.
+  port: String.to_integer(System.get_env("PGPORT", "5432")),
   show_sensitive_data_on_connection_error: true,
   pool_size: 10
 

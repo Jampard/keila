@@ -263,6 +263,18 @@ defmodule KeilaWeb.Router do
     post "/messages/actions/render", ApiMessageController, :render
   end
 
+  pipeline :tenancy do
+    plug KeilaWeb.Tenancy.AuthPlug
+  end
+
+  scope "/tenancy", KeilaWeb do
+    pipe_through :tenancy
+
+    get "/", TenancyController, :index
+    get "/:slug", TenancyController, :show
+    put "/:slug", TenancyController, :update
+  end
+
   # Webhooks
   scope "/api/webhooks", KeilaWeb do
     pipe_through :api

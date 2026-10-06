@@ -3,6 +3,9 @@ defmodule KeilaWeb.ProjectController do
   alias Keila.{Projects, Contacts, Mailings, Templates}
   import Ecto.Changeset
 
+  # A pushed member's projects are the platform's to create and purge (docs/oidc-sso.md, Tenancy push).
+  plug :refuse_pushed_member when action in [:new, :post_new, :delete, :post_delete]
+
   @spec index(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def index(conn, _params) do
     projects = Projects.get_user_projects(conn.assigns.current_user.id)
@@ -112,5 +115,11 @@ defmodule KeilaWeb.ProjectController do
     |> put_meta(:title, gettext("Delete %{project_name}", project_name: project.name))
     |> assign(:changeset, changeset)
     |> render("delete.html")
+  end
+
+  defp refuse_pushed_member(conn, _opts) do
+    if Keila.Tenancy.pushed_user?(conn.assigns.current_user.id),
+      do: conn |> put_status(403) |> text("Forbidden") |> halt(),
+      else: conn
   end
 end

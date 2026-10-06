@@ -15,14 +15,13 @@ defmodule Keila.Auth.Oidc.Login do
   alias Keila.Auth
   alias Keila.Auth.Oidc
   alias Keila.Auth.Oidc.Claims
-  alias Keila.Auth.Oidc.Tenants
   alias Keila.Auth.OidcIdentity
   alias Keila.Auth.User
   alias Keila.Repo
 
   @doc """
-  Signs in — provisioning on first sight — the User `claims` identifies at
-  `provider`, and re-asserts their tenant memberships.
+  Signs in — provisioning on first sight unless the provider's policy is `:pushed` —
+  the User `claims` identifies at `provider`.
   """
   @spec handle_claims(atom() | binary(), map()) :: {:ok, User.t()} | {:error, atom()}
   def handle_claims(provider, claims) do
@@ -53,9 +52,8 @@ defmodule Keila.Auth.Oidc.Login do
 
   defp do_handle_claims(provider, claims) do
     with {:ok, iss, sub} <- identity(provider, claims),
-         {:ok, slugs} <- gate(provider, claims),
-         {:ok, user} <- find_or_provision(iss, sub, claims),
-         :ok <- sync(provider, user, iss, slugs),
+         :ok <- gate(provider, claims),
+         {:ok, user} <- find_or_provision(provider, iss, sub, claims),
          :ok <- sync_admin(provider, user, claims) do
       {:ok, user}
     end
@@ -76,7 +74,7 @@ defmodule Keila.Auth.Oidc.Login do
   defp gate(provider, claims) do
     case Oidc.policy(provider) do
       :entitlement -> entitlement_gate(provider, claims)
-      :tenant_spn -> tenant_gate(provider, claims)
+      :pushed -> :ok
     end
   end
 
@@ -93,29 +91,26 @@ defmodule Keila.Auth.Oidc.Login do
 
       {claim, value} ->
         if Claims.entitled?(claims, claim, value),
-          do: {:ok, []},
+          do: :ok,
           else: {:error, :not_entitled}
     end
   end
 
-  defp tenant_gate(provider, claims) do
-    case Oidc.tenant_prefix(provider) do
-      prefix when prefix in [nil, ""] ->
-        {:error, :provisioning_disabled}
-
-      prefix ->
-        case Claims.tenant_slugs(claims, Oidc.tenant_claim(provider), prefix) do
-          [] -> {:error, :not_entitled}
-          slugs -> {:ok, slugs}
-        end
+  # A pushed provider's users exist only through Keila.Tenancy, which also owns their mail and
+  # decides who may enter: someone holding no live shop is refused like a stranger.
+  defp find_or_provision(provider, iss, sub, claims) do
+    case {Repo.get_by(OidcIdentity, issuer: iss, subject: sub), Oidc.policy(provider)} do
+      {%OidcIdentity{user_id: user_id}, :pushed} -> live_member(user_id)
+      {%OidcIdentity{user_id: user_id}, _policy} -> {:ok, Auth.get_user(user_id)}
+      {nil, :pushed} -> {:error, :not_entitled}
+      {nil, _policy} -> provision(iss, sub, claims)
     end
   end
 
-  defp find_or_provision(iss, sub, claims) do
-    case Repo.get_by(OidcIdentity, issuer: iss, subject: sub) do
-      %OidcIdentity{user_id: user_id} -> {:ok, Auth.get_user(user_id)}
-      nil -> provision(iss, sub, claims)
-    end
+  defp live_member(user_id) do
+    if Keila.Tenancy.holds_live_shop?(user_id),
+      do: {:ok, Auth.get_user(user_id)},
+      else: {:error, :not_entitled}
   end
 
   defp provision(iss, sub, claims) do
@@ -189,19 +184,6 @@ defmodule Keila.Auth.Oidc.Login do
     case Map.get(claims, key) do
       value when is_binary(value) -> value
       _other -> nil
-    end
-  end
-
-  defp sync(provider, user, iss, slugs) do
-    case Oidc.policy(provider) do
-      :tenant_spn ->
-        case Tenants.reconcile(user.id, iss, slugs) do
-          {:ok, _result} -> :ok
-          {:error, _reason} -> {:error, :tenant_sync_failed}
-        end
-
-      _other ->
-        :ok
     end
   end
 

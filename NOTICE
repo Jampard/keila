@@ -10,11 +10,16 @@ are licensed under the same terms (AGPL-3.0).
 Changes from upstream:
 
 - OpenID Connect single sign-on: optional sign-in through one or more
-  OIDC providers, with entitlement- and tenant-based access policies and
-  an OIDC-only mode. See docs/oidc-sso.md.
+  OIDC providers, with an entitlement policy, a `pushed` policy and an
+  OIDC-only mode. See docs/oidc-sso.md.
+- Tenancy push: PUT/GET /tenancy, which provisions one Account and Project
+  per shop from the platform's push and decides who may sign in through
+  the `pushed` provider. See docs/oidc-sso.md.
 - Build and CI: a nix/devenv development environment with a local kanidm
-  identity provider (flake.nix, nix/), a CI workflow (.gitea/workflows/)
-  and a hardened container image (ops/Dockerfile).
+  identity provider, and the deployed container image, both built by
+  flake.nix (packages.<linux>.image, nix/image.nix); a CI workflow
+  (.gitea/workflows/) builds and publishes that image. ops/Dockerfile is
+  upstream's and is not the deployed build.
 - Secrets from files: SECRET_KEY_BASE, KEILA_PASSWORD, DB_PASSWORD,
   MAILER_SMTP_PASSWORD, CAPTCHA_SECRET_KEY, HASHID_SALT and the OIDC client
   secrets can each be read from the file named by <NAME>_FILE.

@@ -60,3 +60,4 @@ worktrees/*
 /.direnv/
 /.nix/
 /.worktrees/
+/tmp/

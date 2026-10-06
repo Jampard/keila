@@ -19,9 +19,6 @@ KANIDMD = os.environ.get("KANIDMD", "kanidmd")
 CLIENT_ID = os.environ.get("KEILA_KANIDM_CLIENT", "keila-merchant")
 PROVIDER = os.environ.get("KEILA_KANIDM_PROVIDER", "merchant")
 ORIGIN = os.environ.get("KEILA_ORIGIN", "http://localhost:4000")
-PREFIX = os.environ.get("KEILA_KANIDM_PREFIX", "merchant")
-SLUG = os.environ.get("KEILA_KANIDM_SLUG", "acme")
-ROLE = os.environ.get("KEILA_KANIDM_ROLE", "admin")
 PERSON = os.environ.get("KEILA_KANIDM_PERSON", "merchant_dev")
 PASSWORD = os.environ.get("KEILA_KANIDM_PASSWORD", "keila-dev-password")
 
@@ -130,11 +127,9 @@ def ensure_client(tok):
         },
         tok,
     )
-    # `groups_spn` not `groups`: `groups` also emits a uuid per group, which the tenant_spn policy
-    # cannot parse into a slug.
     post_ok_if_exists(
         f"/v1/oauth2/{CLIENT_ID}/_scopemap/idm_all_persons",
-        ["openid", "email", "profile", "groups_spn"],
+        ["openid", "email", "profile"],
         tok,
     )
     _, secret = req(f"/v1/oauth2/{CLIENT_ID}/_basic_secret", tok=tok)
@@ -144,27 +139,19 @@ def ensure_client(tok):
 
 
 def ensure_merchant(tok):
-    group = f"{PREFIX}.{SLUG}.{ROLE}"
     post_ok_if_exists(
         "/v1/person",
-        {
-            "attrs": {
-                "name": [PERSON],
-                "displayname": [f"{SLUG} {ROLE}"],
-                "mail": [f"{PERSON}@example.test"],
-            }
-        },
+        {"attrs": {"name": [PERSON], "displayname": [PERSON], "mail": [f"{PERSON}@example.test"]}},
         tok,
     )
-    post_ok_if_exists("/v1/group", {"attrs": {"name": [group]}}, tok)
-    post_ok_if_exists(f"/v1/group/{group}/_attr/member", [PERSON], tok)
 
     _, session = req(f"/v1/person/{PERSON}/_credential/_update", tok=tok)
     if not session:
         raise SystemExit(f"no credential-update session for {PERSON}")
     req("/v1/credential/_update", "POST", [{"password": PASSWORD}, session[0]], tok)
     req("/v1/credential/_commit", "POST", session[0], tok)
-    return group
+    _, person = req(f"/v1/person/{PERSON}", tok=tok)
+    return person["attrs"]["uuid"][0]
 
 
 def main():
@@ -172,7 +159,7 @@ def main():
     tok = admin_token()
     allow_passwords(tok)
     secret = ensure_client(tok)
-    group = ensure_merchant(tok)
+    sub = ensure_merchant(tok)
 
     var = f"KEILA_OIDC_{PROVIDER.upper()}_"
     env_path = f"{WORK}/keila.env"
@@ -185,9 +172,8 @@ def main():
                     f"{var}ISSUER={URL}/oauth2/openid/{CLIENT_ID}",
                     f"{var}CLIENT_ID={CLIENT_ID}",
                     f"{var}CLIENT_SECRET={secret}",
-                    f"{var}POLICY=tenant_spn",
-                    f"{var}TENANT_PREFIX={PREFIX}",
-                    f'{var}SCOPES="openid email profile groups_spn"',
+                    f"{var}POLICY=pushed",
+                    f'{var}SCOPES="openid email profile"',
                     f"{var}CACERTFILE={WORK}/ca.pem",
                     "",
                 ]
@@ -195,7 +181,7 @@ def main():
         )
     print(f"✓ keila CIAM ready at {URL}")
     print(f"  client {CLIENT_ID}; env at {env_path}")
-    print(f"  sign in as {PERSON} / {PASSWORD} (in {group})")
+    print(f"  sign in as {PERSON} / {PASSWORD} once a PUT /tenancy/<slug> lists sub {sub}")
 
 
 if __name__ == "__main__":

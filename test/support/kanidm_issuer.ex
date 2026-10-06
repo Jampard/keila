@@ -7,7 +7,7 @@ defmodule Keila.KanidmIssuer do
   one reachable and configured:
 
     * `KEILA_TEST_KANIDM_ENV` — path to the generated `keila.env`, which carries the
-      issuer, client id, client secret, CA path and tenant prefix.
+      issuer, client id, client secret and CA path.
     * `KEILA_TEST_KANIDM_IDM_PW` — path to `idm_admin.pw`, minted on bring-up.
 
   Both live under `$DEVENV_STATE/kanidm` of the dev stack (`flake.nix`). `configured?/0`
@@ -18,7 +18,7 @@ defmodule Keila.KanidmIssuer do
   namespaced by `unique/1` so concurrent or repeated runs cannot collide.
   """
 
-  defstruct [:base_url, :issuer, :client_id, :client_secret, :cacertfile, :tenant_prefix, :scopes]
+  defstruct [:base_url, :issuer, :client_id, :client_secret, :cacertfile, :scopes]
 
   @type t :: %__MODULE__{
           base_url: String.t(),
@@ -26,7 +26,6 @@ defmodule Keila.KanidmIssuer do
           client_id: String.t(),
           client_secret: String.t(),
           cacertfile: String.t(),
-          tenant_prefix: String.t(),
           scopes: [String.t()]
         }
 
@@ -61,7 +60,6 @@ defmodule Keila.KanidmIssuer do
       client_id: fetch_env!(env, "KEILA_OIDC_MERCHANT_CLIENT_ID"),
       client_secret: fetch_env!(env, "KEILA_OIDC_MERCHANT_CLIENT_SECRET"),
       cacertfile: fetch_env!(env, "KEILA_OIDC_MERCHANT_CACERTFILE"),
-      tenant_prefix: Map.get(env, "KEILA_OIDC_MERCHANT_TENANT_PREFIX", "merchant"),
       scopes: env |> Map.get("KEILA_OIDC_MERCHANT_SCOPES", "") |> String.split(" ", trim: true)
     }
   end
@@ -125,8 +123,7 @@ defmodule Keila.KanidmIssuer do
         client_secret: kanidm.client_secret,
         cacertfile: kanidm.cacertfile,
         scopes: kanidm.scopes,
-        policy: :tenant_spn,
-        tenant_prefix: kanidm.tenant_prefix
+        policy: :pushed
       ],
       overrides
     )
@@ -218,14 +215,10 @@ defmodule Keila.KanidmIssuer do
     set_password!(kanidm, admin_token, person, password)
   end
 
-  @doc "Removes `person` from `group`. kanidm drops values with a DELETE carrying them."
-  @spec remove_from_group!(t(), String.t(), String.t(), String.t()) :: :ok
-  def remove_from_group!(%__MODULE__{} = kanidm, admin_token, person, group) do
-    request!(kanidm, :delete, "/v1/group/#{group}/_attr/member", [person],
-      headers: [{"authorization", "Bearer " <> admin_token}]
-    )
-
-    :ok
+  @doc "The person's uuid, which is the `sub` kanidm issues for it."
+  @spec person_uuid!(t(), String.t(), String.t()) :: String.t()
+  def person_uuid!(%__MODULE__{} = kanidm, admin_token, person) do
+    await_resolvable!(kanidm, admin_token, person)
   end
 
   @doc """
@@ -333,7 +326,7 @@ defmodule Keila.KanidmIssuer do
 
     cond do
       is_binary(uuid) ->
-        :ok
+        uuid
 
       attempts > 0 ->
         Process.sleep(200)

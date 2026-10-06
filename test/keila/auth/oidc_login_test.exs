@@ -7,7 +7,6 @@ defmodule Keila.Auth.OidcLoginTest do
   alias Keila.Auth.Oidc.Login
   alias Keila.Auth.OidcIdentity
   alias Keila.Auth.User
-  alias Keila.Projects
 
   @staff_issuer "https://idp.example.com/oauth2/openid/keila"
   @merchant_issuer "https://shop.example.com/oidc"
@@ -25,8 +24,7 @@ defmodule Keila.Auth.OidcLoginTest do
     issuer: @merchant_issuer,
     client_id: "keila-merchant",
     client_secret: "sh0p",
-    policy: :tenant_spn,
-    tenant_prefix: "org"
+    policy: :pushed
   ]
 
   setup do
@@ -64,20 +62,18 @@ defmodule Keila.Auth.OidcLoginTest do
     )
   end
 
-  defp merchant_claims(groups, overrides \\ %{}) do
+  defp merchant_claims(overrides \\ %{}) do
     Map.merge(
-      %{
-        "iss" => @merchant_issuer,
-        "sub" => "sub-mia",
-        "email" => "mia@example.com",
-        "groups" => groups
-      },
+      %{"iss" => @merchant_issuer, "sub" => "sub-mia", "email" => "mia@example.com"},
       overrides
     )
   end
 
-  defp project_names(user_id) do
-    user_id |> Projects.get_user_projects() |> Enum.map(& &1.name) |> Enum.sort()
+  defp pushed_user(sub, email) do
+    member = %{sub: sub, mail: email, role: "merchant"}
+    state = %{version: 1, state: "live", name: "Acme", domains: [], members: [member]}
+    {:ok, :applied} = Keila.Tenancy.apply_state("acme", state)
+    Repo.get!(User, Repo.get_by!(OidcIdentity, issuer: @merchant_issuer, subject: sub).user_id)
   end
 
   @tag :oidc
@@ -219,54 +215,24 @@ defmodule Keila.Auth.OidcLoginTest do
   end
 
   @tag :oidc
-  test "a tenant login creates the tenant Projects and grants access to them" do
-    put_config(providers: [merchant: @merchant])
-
-    groups = ["org.acme.admin@idm.example.com", "org.globex.viewer@idm.example.com"]
-    assert {:ok, user} = Login.handle_claims(:merchant, merchant_claims(groups))
-
-    assert ["acme", "globex"] == project_names(user.id)
-  end
-
-  @tag :oidc
-  test "a later login with fewer tenants revokes the dropped one and keeps the rest" do
-    put_config(providers: [merchant: @merchant])
-
-    groups = ["org.acme.admin@idm.example.com", "org.globex.viewer@idm.example.com"]
-    assert {:ok, user} = Login.handle_claims(:merchant, merchant_claims(groups))
-    assert ["acme", "globex"] == project_names(user.id)
-
-    smaller = merchant_claims(["org.acme.admin@idm.example.com"])
-    assert {:ok, same_user} = Login.handle_claims(:merchant, smaller)
-
-    assert same_user.id == user.id
-    assert ["acme"] == project_names(user.id)
-  end
-
-  @tag :oidc
-  test "a groups claim with no matching tenant entry is refused and writes no rows" do
+  test "a pushed provider refuses a subject it was never pushed and writes no rows" do
     put_config(providers: [merchant: @merchant])
     before = counts()
 
-    groups = ["idm_all_persons@idm.example.com", "org.broken@idm.example.com"]
-    assert {:error, :not_entitled} = Login.handle_claims(:merchant, merchant_claims(groups))
-
+    assert {:error, :not_entitled} = Login.handle_claims(:merchant, merchant_claims())
     assert counts() == before
   end
 
   @tag :oidc
-  test "a kanidm groups claim mixing UUIDs and SPNs grants exactly the SPN tenants" do
+  test "a pushed subject signs in as its pushed User and the token's mail changes nothing" do
     put_config(providers: [merchant: @merchant])
+    user = pushed_user("sub-mia", "mia@shop.example.com")
 
-    groups = [
-      "4d21d04a-dc0d-42eb-96f8-1e5d1a1a1234",
-      "org.acme.admin@idm.example.com",
-      "idm_all_persons@idm.example.com",
-      "org.globex.viewer@idm.example.com"
-    ]
-
-    assert {:ok, user} = Login.handle_claims(:merchant, merchant_claims(groups))
-    assert ["acme", "globex"] == project_names(user.id)
+    claims = merchant_claims(%{"email" => "other@example.com"})
+    assert {:ok, same} = Login.handle_claims(:merchant, claims)
+    assert same.id == user.id
+    assert Repo.get(User, user.id).email == "mia@shop.example.com"
+    assert Login.idp_managed?(user.id)
   end
 
   @tag :oidc
@@ -352,16 +318,13 @@ defmodule Keila.Auth.OidcLoginTest do
     put_config(providers: [staff: @staff, merchant: @merchant])
 
     {:ok, staff_user} = Login.handle_claims(:staff, staff_claims(%{"sub" => "shared-sub"}))
+    pushed = pushed_user("shared-sub", "shared@shop.example.com")
 
-    forged =
-      merchant_claims(["org.acme.admin"], %{"iss" => @staff_issuer, "sub" => "shared-sub"})
-
+    forged = merchant_claims(%{"iss" => @staff_issuer, "sub" => "shared-sub"})
     {:ok, merchant_user} = Login.handle_claims(:merchant, forged)
 
+    assert merchant_user.id == pushed.id
     refute merchant_user.id == staff_user.id
-
-    assert Repo.get_by(OidcIdentity, issuer: @merchant_issuer, subject: "shared-sub")
-    assert Repo.aggregate(OidcIdentity, :count) == 2
   end
 
   @tag :oidc
@@ -453,26 +416,12 @@ defmodule Keila.Auth.OidcLoginTest do
   end
 
   @tag :oidc
-  test "admin_value on a tenant_spn provider is inert" do
+  test "admin_value on a pushed provider is inert" do
     put_config(providers: [merchant: Keyword.put(@merchant, :admin_value, "keila_admins")])
+    user = pushed_user("sub-mia", "mia@shop.example.com")
 
-    groups = ["org.acme.admin@idm.example.com", "keila_admins"]
-    assert {:ok, user} = Login.handle_claims(:merchant, merchant_claims(groups))
+    claims = merchant_claims(%{"groups" => ["keila_admins"], "keila_admins" => "keila_admins"})
+    assert {:ok, _user} = Login.handle_claims(:merchant, claims)
     refute admin?(user.id)
-  end
-
-  @tag :oidc
-  test "an unprocessable tenant entry does not block revoking withdrawn tenants" do
-    put_config(providers: [merchant: @merchant])
-
-    {:ok, user} =
-      Login.handle_claims(:merchant, merchant_claims(["org.acme.admin", "org.globex.admin"]))
-
-    assert ["acme", "globex"] == project_names(user.id)
-
-    poison = "org.#{String.duplicate("a", 300)}.admin"
-    Login.handle_claims(:merchant, merchant_claims([poison]))
-
-    assert [] == project_names(user.id)
   end
 end

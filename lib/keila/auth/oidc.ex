@@ -7,8 +7,7 @@ defmodule Keila.Auth.Oidc do
 
   @default_scopes ["openid", "email", "profile"]
   @default_policy :entitlement
-  @default_tenant_claim "groups"
-  @policies [:entitlement, :tenant_spn]
+  @policies [:entitlement, :pushed]
   @staff_provider :staff
 
   @spec providers() :: keyword(keyword())
@@ -18,6 +17,49 @@ defmodule Keila.Auth.Oidc do
     |> case do
       providers when is_list(providers) -> Enum.filter(providers, &valid_provider?/1)
       _other -> []
+    end
+  end
+
+  @doc """
+  Parses a `KEILA_OIDC_<NAME>_POLICY` value; anything but a current policy refuses boot.
+  """
+  @spec parse_policy!(String.t(), String.t() | nil) :: atom()
+  def parse_policy!(name, value) do
+    case value |> to_string() |> String.downcase() do
+      "" ->
+        @default_policy
+
+      "entitlement" ->
+        :entitlement
+
+      "pushed" ->
+        :pushed
+
+      other ->
+        raise ArgumentError,
+              "KEILA_OIDC_#{String.upcase(name)}_POLICY=#{other} is not a policy (entitlement, pushed)"
+    end
+  end
+
+  @doc """
+  Refuses boot on any unknown `KEILA_OIDC_*_POLICY` and while any tenant_spn-era variable is
+  still set: a stale config must fail the deploy, not run silently.
+  """
+  @spec refuse_stale_config!(%{String.t() => String.t()}) :: :ok
+  def refuse_stale_config!(env) do
+    for {key, value} <- env, [_, name] <- [Regex.run(~r/^KEILA_OIDC_(.+)_POLICY$/, key)] do
+      parse_policy!(name, value)
+    end
+
+    case env
+         |> Map.keys()
+         |> Enum.filter(&Regex.match?(~r/^KEILA_OIDC_.+_TENANT_(PREFIX|CLAIM)$/, &1)) do
+      [] ->
+        :ok
+
+      stale ->
+        raise ArgumentError,
+              "#{Enum.join(Enum.sort(stale), ", ")} belong to the removed tenant_spn policy; unset them"
     end
   end
 
@@ -86,19 +128,6 @@ defmodule Keila.Auth.Oidc do
 
   @spec admin_value(atom() | binary()) :: binary() | nil
   def admin_value(name), do: fetch(name, :admin_value)
-
-  @spec tenant_prefix(atom() | binary()) :: binary() | nil
-  def tenant_prefix(name), do: fetch(name, :tenant_prefix)
-
-  @spec tenant_claim(atom() | binary()) :: binary() | nil
-  def tenant_claim(name) do
-    with opts when is_list(opts) <- provider(name) do
-      case Keyword.get(opts, :tenant_claim) do
-        value when is_binary(value) and value != "" -> value
-        _other -> @default_tenant_claim
-      end
-    end
-  end
 
   @spec scopes(atom() | binary()) :: [binary()] | nil
   def scopes(name) do

@@ -21,8 +21,7 @@ defmodule KeilaWeb.OidcStaffEntryTest do
     issuer: "https://shop.example.com",
     client_id: "keila-merchant",
     client_secret: "sh0p",
-    policy: :tenant_spn,
-    tenant_prefix: "org",
+    policy: :pushed,
     label: "Merchant sign-in"
   ]
 

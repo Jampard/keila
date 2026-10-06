@@ -82,18 +82,15 @@ jobs:
             [ -n "${!v}" ] || { echo "repository variable $v is unset"; exit 1; }
           done
 
-      # Registry credentials come from the runner's REGISTRY_AUTH_FILE.
-      - name: Build image
-        run: |
-          podman build \
-            --progress=plain \
-            -f ops/Dockerfile \
-            --build-arg KEILA_SOURCE_URL=${{ vars.SOURCE_URL }} \
-            --build-arg KEILA_SOURCE_REVISION=${{ github.sha }} \
-            -t $IMAGE:${{ github.ref_name }} \
-            -t $IMAGE:${{ github.sha }} .
+      # The deployed image is the flake's, the same derivation the deployment's VM check builds from GitHub.
+      - name: Build the nix image
+        run: $NIX build --print-build-logs --out-link keila-image "git+file://$PWD?shallow=1#packages.x86_64-linux.image"
 
-      - name: Push image
+      # Registry credentials come from the runner's REGISTRY_AUTH_FILE.
+      - name: Load, tag and push the image
         run: |
+          set -euo pipefail
+          loaded=$(podman load --quiet < keila-image | sed -n 's/^Loaded image: //p')
+          podman tag "$loaded" "$IMAGE:${{ github.ref_name }}" "$IMAGE:${{ github.sha }}"
           podman push --tls-verify=$REGISTRY_TLS_VERIFY $IMAGE:${{ github.ref_name }}
           podman push --tls-verify=$REGISTRY_TLS_VERIFY $IMAGE:${{ github.sha }}

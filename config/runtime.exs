@@ -417,6 +417,8 @@ source_link =
 
 config :keila, KeilaWeb.SourceLink, source_link
 
+config :keila, Keila.Tenancy, secret: Keila.SecretEnv.get("KEILA_TENANCY_SECRET")
+
 # OIDC SSO
 split_list = fn
   value when value in [nil, ""] -> []
@@ -424,6 +426,13 @@ split_list = fn
 end
 
 oidc_provider_names = System.get_env("KEILA_OIDC_PROVIDERS") |> split_list.()
+
+try do
+  Keila.Auth.Oidc.refuse_stale_config!(System.get_env())
+rescue
+  e in ArgumentError ->
+    exit_from_exception.(e, "Refusing to boot with a stale OIDC configuration.")
+end
 
 if oidc_provider_names != [] do
   oidc_providers =
@@ -440,28 +449,13 @@ if oidc_provider_names != [] do
         |> Enum.filter(fn {_, value} -> value in [nil, ""] end)
         |> Enum.map(fn {suffix, _} -> prefix <> suffix end)
 
-      policy =
-        case System.get_env(prefix <> "POLICY", "entitlement") |> String.downcase() do
-          "entitlement" -> :entitlement
-          "tenant_spn" -> :tenant_spn
-          other -> {:unknown, other}
-        end
+      policy = Keila.Auth.Oidc.parse_policy!(name, System.get_env(prefix <> "POLICY"))
 
       cond do
         missing != [] ->
           Logger.warning("""
           OIDC provider "#{name}" is not configured and will be skipped.
           Missing environment variables: #{Enum.join(missing, ", ")}
-          """)
-
-          []
-
-        match?({:unknown, _}, policy) ->
-          {:unknown, other} = policy
-
-          Logger.warning("""
-          OIDC provider "#{name}" has an unknown #{prefix}POLICY value "#{other}" and will be skipped.
-          Accepted values: entitlement, tenant_spn
           """)
 
           []
@@ -491,8 +485,6 @@ if oidc_provider_names != [] do
               System.get_env(prefix <> "ENTITLEMENT_VALUE")
             )
             |> put_if_not_empty.(:admin_value, System.get_env(prefix <> "ADMIN_VALUE"))
-            |> put_if_not_empty.(:tenant_prefix, System.get_env(prefix <> "TENANT_PREFIX"))
-            |> put_if_not_empty.(:tenant_claim, System.get_env(prefix <> "TENANT_CLAIM"))
             |> put_if_not_empty.(:cacertfile, System.get_env(prefix <> "CACERTFILE"))
 
           [{key, opts}]
@@ -517,13 +509,12 @@ else
     - KEILA_OIDC_<NAME>_CLIENT_SECRET (required)
     - KEILA_OIDC_<NAME>_SCOPES (defaults to "openid email profile")
     - KEILA_OIDC_<NAME>_LABEL (defaults to the capitalized provider name)
-    - KEILA_OIDC_<NAME>_POLICY ("entitlement" or "tenant_spn", defaults to "entitlement")
+    - KEILA_OIDC_<NAME>_POLICY ("entitlement" or "pushed", defaults to "entitlement";
+      an unknown value refuses boot)
     - KEILA_OIDC_<NAME>_ENTITLEMENT_CLAIM (for the entitlement policy)
     - KEILA_OIDC_<NAME>_ENTITLEMENT_VALUE (for the entitlement policy)
     - KEILA_OIDC_<NAME>_ADMIN_VALUE (entitlement policy: holders of this value on the
       same claim gain Keila admin, reconciled on every sign-in)
-    - KEILA_OIDC_<NAME>_TENANT_PREFIX (for the tenant_spn policy)
-    - KEILA_OIDC_<NAME>_TENANT_CLAIM (for the tenant_spn policy, defaults to "groups")
     - KEILA_OIDC_<NAME>_CACERTFILE (PEM to verify the IdP against, for a private CA;
       it replaces the system trust store for this provider rather than adding to it)
 

@@ -156,7 +156,7 @@ defmodule KeilaWeb.OidcController do
   end
 
   defp gate_claims(provider) do
-    [Oidc.entitlement_claim(provider), Oidc.tenant_claim(provider)]
+    [Oidc.entitlement_claim(provider)]
     |> Enum.filter(&is_binary/1)
   end
 
