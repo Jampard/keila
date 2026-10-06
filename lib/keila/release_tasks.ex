@@ -29,7 +29,7 @@ defmodule Keila.ReleaseTasks do
   deployment. A no-op when the variable is unset or already in effect.
   """
   def sync_root_password() do
-    with password when password not in [nil, ""] <- System.get_env("KEILA_PASSWORD"),
+    with password when password not in [nil, ""] <- Keila.SecretEnv.get("KEILA_PASSWORD"),
          email = System.get_env("KEILA_USER") || "root@localhost",
          %Keila.Auth.User{} = user <- Keila.Auth.find_user_by_email(email) do
       unless is_binary(user.password_hash) and Argon2.verify_pass(password, user.password_hash) do

@@ -25,7 +25,7 @@ if Repo.all(Auth.Group) == [] do
     end
 
   password =
-    case System.get_env("KEILA_PASSWORD") do
+    case Keila.SecretEnv.get("KEILA_PASSWORD") do
       password when password not in ["", nil] ->
         password
 

@@ -47,7 +47,7 @@ internal provider key) has its own set of `KEILA_OIDC_<NAME>_*` variables.
 | `KEILA_OIDC_PROVIDERS` | to enable OIDC at all | unset (OIDC disabled) | space/comma/tab/newline-separated list of provider names |
 | `KEILA_OIDC_<NAME>_ISSUER` | yes | — | provider skipped if missing |
 | `KEILA_OIDC_<NAME>_CLIENT_ID` | yes | — | provider skipped if missing |
-| `KEILA_OIDC_<NAME>_CLIENT_SECRET` | yes | — | provider skipped if missing |
+| `KEILA_OIDC_<NAME>_CLIENT_SECRET` | yes | — | provider skipped if missing; `…_CLIENT_SECRET_FILE` reads it from a file |
 | `KEILA_OIDC_<NAME>_SCOPES` | no | `openid email profile` | space/comma/tab/newline-separated; if set but empty, falls back to the default rather than requesting no scopes |
 | `KEILA_OIDC_<NAME>_LABEL` | no | the provider name, capitalized (e.g. `staff` → `Staff`) | |
 | `KEILA_OIDC_<NAME>_POLICY` | no | `entitlement` | `entitlement` or `tenant_spn`, case-insensitive; **any other value skips the whole provider**, it does not fall back to the default |

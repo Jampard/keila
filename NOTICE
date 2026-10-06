@@ -15,6 +15,9 @@ Changes from upstream:
 - Build and CI: a nix/devenv development environment with a local kanidm
   identity provider (flake.nix, nix/), a CI workflow (.gitea/workflows/)
   and a hardened container image (ops/Dockerfile).
+- Secrets from files: SECRET_KEY_BASE, KEILA_PASSWORD, DB_PASSWORD,
+  MAILER_SMTP_PASSWORD, CAPTCHA_SECRET_KEY, HASHID_SALT and the OIDC client
+  secrets can each be read from the file named by <NAME>_FILE.
 - Source link: every page of the web interface links the source code of
   the running version (KEILA_SOURCE_URL, KEILA_SOURCE_REVISION), as
   required by section 13 of the AGPL.

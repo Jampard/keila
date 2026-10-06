@@ -70,6 +70,10 @@ if config_env() == :prod do
       url: db_url,
       ssl: ssl,
       ssl_opts: ssl_opts
+
+    # A password inside DB_URL still wins: Ecto merges the URL's own fields over these.
+    db_password = Keila.SecretEnv.get("DB_PASSWORD")
+    if db_password not in [nil, ""], do: config(:keila, Keila.Repo, password: db_password)
   rescue
     e ->
       exit_from_exception.(e, """
@@ -122,7 +126,7 @@ if config_env() == :prod do
           host = System.fetch_env!("MAILER_SMTP_HOST")
           from_email = System.fetch_env!("MAILER_SMTP_FROM_EMAIL")
           user = System.get_env("MAILER_SMTP_USER") || from_email
-          password = if auth_method != :none, do: System.fetch_env!("MAILER_SMTP_PASSWORD")
+          password = if auth_method != :none, do: Keila.SecretEnv.fetch!("MAILER_SMTP_PASSWORD")
           port = System.get_env("MAILER_SMTP_PORT", "587") |> maybe_to_int.()
 
           [
@@ -187,7 +191,7 @@ if config_env() == :prod do
   captcha_site_key = System.get_env("CAPTCHA_SITE_KEY") || System.get_env("HCAPTCHA_SITE_KEY")
 
   captcha_secret_key =
-    System.get_env("CAPTCHA_SECRET_KEY") || System.get_env("HCAPTCHA_SECRET_KEY")
+    Keila.SecretEnv.get("CAPTCHA_SECRET_KEY") || Keila.SecretEnv.get("HCAPTCHA_SECRET_KEY")
 
   captcha_verify_url =
     System.get_env("CAPTCHA_VERIFY_URL") || System.get_env("CAPTCHA_URL") ||
@@ -233,7 +237,7 @@ if config_env() == :prod do
 
   # Secret Key Base
   try do
-    secret_key_base = System.fetch_env!("SECRET_KEY_BASE")
+    secret_key_base = Keila.SecretEnv.fetch!("SECRET_KEY_BASE")
 
     live_view_salt =
       :crypto.hash(:sha384, secret_key_base <> "live_view_salt") |> Base.url_encode64()
@@ -260,7 +264,7 @@ if config_env() == :prod do
     Application.get_env(:keila, KeilaWeb.Endpoint) |> Keyword.fetch!(:secret_key_base)
 
   hashid_salt =
-    case System.get_env("HASHID_SALT") do
+    case Keila.SecretEnv.get("HASHID_SALT") do
       empty when empty in [nil, ""] ->
         Logger.warning("""
         You have not configured a Hashid salt. Defaulting to
@@ -429,7 +433,7 @@ if oidc_provider_names != [] do
 
       issuer = System.get_env(prefix <> "ISSUER")
       client_id = System.get_env(prefix <> "CLIENT_ID")
-      client_secret = System.get_env(prefix <> "CLIENT_SECRET")
+      client_secret = Keila.SecretEnv.get(prefix <> "CLIENT_SECRET")
 
       missing =
         [{"ISSUER", issuer}, {"CLIENT_ID", client_id}, {"CLIENT_SECRET", client_secret}]
