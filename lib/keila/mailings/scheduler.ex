@@ -267,17 +267,23 @@ defmodule Keila.Mailings.Scheduler do
     end
   end
 
+  # Not `id in subquery(...)`: Postgres may re-run a LIMIT 1 SKIP LOCKED subquery per
+  # outer row and queue several messages for one delivery job.
   defp set_next_message_queued(sender) do
-    message_id = next_message_id_query(sender)
+    case Repo.one(next_message_id_query(sender)) do
+      nil ->
+        {0, []}
 
-    from(m in Message,
-      where: m.id in subquery(message_id),
-      update: [
-        set: [status: :queued, queued_at: fragment("NOW()"), updated_at: fragment("NOW()")]
-      ],
-      select: m.id
-    )
-    |> Repo.update_all([])
+      message_id ->
+        from(m in Message,
+          where: m.id == ^message_id,
+          update: [
+            set: [status: :queued, queued_at: fragment("NOW()"), updated_at: fragment("NOW()")]
+          ],
+          select: m.id
+        )
+        |> Repo.update_all([])
+    end
   end
 
   defp next_message_id_query(sender) do
