@@ -36,7 +36,45 @@
       system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
-        beam = pkgs.beam27Packages;
+        # Newer nixpkgs moved elixir/erlang/hex from mixRelease/fetchMixDeps call args to
+        # callPackage-scope params (and gained `overrideScope` on beamPackages to set them);
+        # feature-detect so this still builds on an nixpkgs old enough to lack both.
+        beam =
+          if pkgs.beam27Packages ? overrideScope then
+            let
+              scopedBeam = pkgs.beam27Packages.overrideScope (final: prev: { elixir = prev.elixir_1_18; });
+            in
+            scopedBeam
+            // {
+              mixRelease =
+                args:
+                scopedBeam.mixRelease (
+                  removeAttrs args [
+                    "elixir"
+                    "erlang"
+                    "hex"
+                    "forceGitDeps"
+                  ]
+                  // {
+                    env = (args.env or { }) // {
+                      forceGitDeps = "1";
+                    };
+                    postPatch = (args.postPatch or "") + ''
+                      export stdenv="${pkgs.stdenv}"
+                    '';
+                  }
+                );
+              fetchMixDeps =
+                args:
+                scopedBeam.fetchMixDeps (
+                  removeAttrs args [
+                    "elixir"
+                    "hex"
+                  ]
+                );
+            }
+          else
+            pkgs.beam27Packages;
 
         # Off 5432/8443/8444 and below platform's 8600+ worktree lattice: shared CI runners host both.
         ports = {
@@ -49,7 +87,11 @@
         origin = "http://localhost:${toString ports.keila}";
         issuer = "https://localhost:${toString ports.kanidm}";
         image = import ./nix/image.nix {
-          inherit pkgs beam;
+          # editorjs (git dep) needs fetcherVersion 2 under newer nixpkgs' fetchNpmDeps.
+          pkgs = pkgs // {
+            fetchNpmDeps = args: pkgs.fetchNpmDeps (args // { npmDepsFetcherVersion = 2; });
+          };
+          inherit beam;
           sourceUrl = "https://github.com/Jampard/keila";
           revision = self.rev or null;
         };
