@@ -1,5 +1,5 @@
 {
-  description = "Keila: the deployed image (packages.<linux>.image)";
+  description = "Keila: the deployed release (packages.<linux>.keila) and its image";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/b6c98e9e6633ee64753b594ff4a5febf0367fc00";
