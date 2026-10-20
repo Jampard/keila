@@ -52,4 +52,33 @@ defmodule Keila.ReleaseTasksTest do
     System.put_env("KEILA_USER", "nobody@example.com")
     assert :ok = ReleaseTasks.sync_root_password()
   end
+
+  test "an empty KEILA_USER means root@localhost, as in the seed" do
+    {:ok, _user} =
+      Auth.create_user(%{"email" => "root@localhost", "password" => "the-first-password"})
+
+    System.put_env("KEILA_USER", "")
+    System.put_env("KEILA_PASSWORD", "the-rotated-password")
+    assert :ok = ReleaseTasks.sync_root_password()
+
+    assert {:ok, _user} =
+             Auth.find_user_by_credentials(%{
+               "email" => "root@localhost",
+               "password" => "the-rotated-password"
+             })
+  end
+
+  test "a password the schema refuses keeps the old one instead of raising" do
+    {:ok, _user} =
+      Auth.create_user(%{"email" => "root@localhost", "password" => "the-first-password"})
+
+    System.put_env("KEILA_PASSWORD", "short")
+    assert {:error, :invalid_password} = ReleaseTasks.sync_root_password()
+
+    assert {:ok, _user} =
+             Auth.find_user_by_credentials(%{
+               "email" => "root@localhost",
+               "password" => "the-first-password"
+             })
+  end
 end
