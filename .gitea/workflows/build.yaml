@@ -23,17 +23,19 @@ jobs:
     runs-on: native
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       # devenv execs a bare `nix`; without this it resolves to the repo's nix/ directory.
       - name: Put nix on PATH for devenv's own internal nix calls
         run: echo "/run/current-system/sw/bin" >> "$GITHUB_PATH"
 
       - name: Clear any devenv processes left running from a previous run
-        run: $NIX develop . --no-pure-eval --command process-compose down 2>/dev/null || true
+        run: $NIX develop ./dev --no-pure-eval --command process-compose down 2>/dev/null || true
 
       - name: mix deps.get, compile --warnings-as-errors, format check
         run: |
-          $NIX develop . --no-pure-eval --command bash -c '
+          $NIX develop ./dev --no-pure-eval --command bash -c '
             set -euo pipefail
             mix local.hex --force
             mix local.rebar --force
@@ -43,7 +45,7 @@ jobs:
           '
 
       - name: Start devenv processes (postgres + kanidm + realm provisioning), detached
-        run: $NIX develop . --no-pure-eval --command devenv up -D
+        run: $NIX develop ./dev --no-pure-eval --command devenv up -D
 
       - name: Wait for the realm to be provisioned (kanidm-provision is a one-shot)
         run: |
@@ -54,31 +56,33 @@ jobs:
             sleep 2
           done
           echo "$ready never appeared after 120s — kanidm-provision did not finish"
-          $NIX develop . --no-pure-eval --command process-compose down || true
+          $NIX develop ./dev --no-pure-eval --command process-compose down || true
           exit 1
 
       # Do not source keila.env here: the app would start its own OIDC supervisor and
       # collide with the ones the tests start.
       - name: mix test
-        run: $NIX develop . --no-pure-eval --command mix test
+        run: $NIX develop ./dev --no-pure-eval --command mix test
 
       - name: Stop devenv processes
         if: always()
-        run: $NIX develop . --no-pure-eval --command process-compose down || true
+        run: $NIX develop ./dev --no-pure-eval --command process-compose down || true
 
   build:
     runs-on: native
     needs: test
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
-      - name: Require the registry and source-link variables
+      # The source link is flake.nix's sourceUrl, so only the registry variables are needed here.
+      - name: Require the registry variables
         shell: bash
         env:
           IMAGE_NAME: ${{ vars.IMAGE_NAME }}
-          SOURCE_URL: ${{ vars.SOURCE_URL }}
         run: |
-          for v in REGISTRY IMAGE_NAME SOURCE_URL; do
+          for v in REGISTRY IMAGE_NAME; do
             [ -n "${!v}" ] || { echo "repository variable $v is unset"; exit 1; }
           done
 
@@ -87,10 +91,15 @@ jobs:
         run: $NIX build --print-build-logs --out-link keila-image "git+file://$PWD?shallow=1#packages.x86_64-linux.image"
 
       # Registry credentials come from the runner's REGISTRY_AUTH_FILE.
+      # ref_name and sha come in through env, never spliced into the script; a / in a branch is not a valid tag.
       - name: Load, tag and push the image
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
+          tag="${REF_NAME//\//-}"
           loaded=$(podman load --quiet < keila-image | sed -n 's/^Loaded image: //p')
-          podman tag "$loaded" "$IMAGE:${{ github.ref_name }}" "$IMAGE:${{ github.sha }}"
-          podman push --tls-verify=$REGISTRY_TLS_VERIFY $IMAGE:${{ github.ref_name }}
-          podman push --tls-verify=$REGISTRY_TLS_VERIFY $IMAGE:${{ github.sha }}
+          podman tag "$loaded" "$IMAGE:$tag" "$IMAGE:$SHA"
+          podman push --tls-verify="$REGISTRY_TLS_VERIFY" "$IMAGE:$tag"
+          podman push --tls-verify="$REGISTRY_TLS_VERIFY" "$IMAGE:$SHA"
