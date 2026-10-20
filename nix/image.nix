@@ -114,10 +114,13 @@ let
     # fast_html's Makefile runs cmake itself; the setup hook would hijack mixRelease's configurePhase.
     dontUseCmakeConfigure = true;
 
+    # config.exs reads KEILA_SOURCE_* into the release, so the native service links its source too.
     env = {
       MIX_ESBUILD_PATH = lib.getExe pkgs.esbuild;
       RUSTLER_PRECOMPILED_GLOBAL_CACHE_PATH = mjmlNif;
-    };
+      KEILA_SOURCE_URL = sourceUrl;
+    }
+    // lib.optionalAttrs (revision != null) { KEILA_SOURCE_REVISION = revision; };
 
     # assets/package.json resolves phoenix* as file:../deps/*, so the deps must be in place before npm runs.
     postPatch = ''

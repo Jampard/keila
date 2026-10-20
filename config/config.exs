@@ -136,6 +136,12 @@ config :swoosh, :api_client, Swoosh.ApiClient.Req
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
+# The source of this build (AGPL §13), fixed into a release when it is built; runtime.exs lets
+# KEILA_SOURCE_URL and KEILA_SOURCE_REVISION at boot override it.
+config :keila, KeilaWeb.SourceLink,
+  url: System.get_env("KEILA_SOURCE_URL"),
+  revision: System.get_env("KEILA_SOURCE_REVISION")
+
 import_config "#{config_env()}.exs"
 
 if System.get_env("KEILA_CLOUD") in ["1", "true", "TRUE"] do
