@@ -1,13 +1,13 @@
 defmodule Keila.SecretEnv do
   @moduledoc """
   Reads a secret from the file named by `<NAME>_FILE` when that is set, else from `<NAME>`.
-  Trailing newlines are dropped from the file's contents.
+  Trailing newlines, LF or CRLF, are dropped from the file's contents.
   """
 
   @spec get(String.t()) :: String.t() | nil
   def get(name) do
     case System.get_env(name <> "_FILE") do
-      path when path not in [nil, ""] -> path |> File.read!() |> String.trim_trailing("\n")
+      path when path not in [nil, ""] -> path |> File.read!() |> String.replace(~r/[\r\n]+\z/, "")
       _ -> System.get_env(name)
     end
   end

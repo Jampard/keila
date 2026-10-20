@@ -21,6 +21,15 @@ defmodule Keila.SecretEnvTest do
     assert SecretEnv.get(@name) == "from-file"
   end
 
+  @tag :tmp_dir
+  test "a file written with CRLF line endings loses its trailing CRLF", %{tmp_dir: dir} do
+    path = Path.join(dir, "secret")
+    File.write!(path, "from-file\r\n")
+    System.put_env(@name <> "_FILE", path)
+
+    assert SecretEnv.get(@name) == "from-file"
+  end
+
   test "falls back to the plain variable without a _FILE" do
     System.put_env(@name, "from-env")
     assert SecretEnv.get(@name) == "from-env"
