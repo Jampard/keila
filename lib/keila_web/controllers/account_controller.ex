@@ -1,3 +1,4 @@
+# Modified by EklipseTech, 2026; see NOTICE.
 defmodule KeilaWeb.AccountController do
   use KeilaWeb, :controller
   import Ecto.Changeset

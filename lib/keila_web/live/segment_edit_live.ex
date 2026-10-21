@@ -1,3 +1,4 @@
+# Modified by EklipseTech, 2026; see NOTICE.
 defmodule KeilaWeb.SegmentEditLive do
   use KeilaWeb, :live_view
   on_mount {KeilaWeb.LiveAuth, :project}

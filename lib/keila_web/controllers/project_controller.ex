@@ -1,3 +1,4 @@
+# Modified by EklipseTech, 2026; see NOTICE.
 defmodule KeilaWeb.ProjectController do
   use KeilaWeb, :controller
   alias Keila.{Projects, Contacts, Mailings, Templates}

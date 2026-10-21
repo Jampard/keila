@@ -1,3 +1,4 @@
+# Modified by EklipseTech, 2026; see NOTICE.
 defmodule Keila.Factory do
   @moduledoc """
   The idea behind this simple Factory module comes straight from the

@@ -1,3 +1,4 @@
+# Modified by EklipseTech, 2026; see NOTICE.
 import Config
 
 # Configure your database

@@ -1,3 +1,4 @@
+# Modified by EklipseTech, 2026; see NOTICE.
 defmodule Keila.FilesTest do
   use Keila.DataCase, async: false
   use Keila.FileCase

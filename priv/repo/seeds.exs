@@ -1,3 +1,4 @@
+# Modified by EklipseTech, 2026; see NOTICE.
 # Script for populating the database. You can run it as:
 #
 #     mix run priv/repo/seeds.exs

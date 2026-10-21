@@ -1,3 +1,4 @@
+# Modified by EklipseTech, 2026; see NOTICE.
 defmodule KeilaWeb.AuthController do
   use KeilaWeb, :controller
   alias Keila.Auth

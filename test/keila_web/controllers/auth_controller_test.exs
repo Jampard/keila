@@ -1,3 +1,4 @@
+# Modified by EklipseTech, 2026; see NOTICE.
 defmodule KeilaWeb.AuthControllerTest do
   use KeilaWeb.ConnCase
   use Oban.Testing, repo: Keila.Repo

@@ -1,3 +1,4 @@
+# Modified by EklipseTech, 2026; see NOTICE.
 defmodule KeilaWeb.AuthSession do
   @moduledoc """
   Helper module for authenticated sessions. Adds `@current_user`

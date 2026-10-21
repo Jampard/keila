@@ -1,3 +1,4 @@
+# Modified by EklipseTech, 2026; see NOTICE.
 defmodule Keila.Application do
   # See https://hexdocs.pm/elixir/Application.html
   # for more information on OTP Applications

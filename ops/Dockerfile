@@ -1,3 +1,4 @@
+# Modified by EklipseTech, 2026; see NOTICE.
 # Not the deployed build: this fork's image is flake.nix packages.<linux>.image (see NOTICE).
 FROM docker.io/library/elixir:1.18-alpine@sha256:caa6412c072c4b11e8c6798108388702c2791b4f8bad41e42c27ea5be881e2dc AS build
 

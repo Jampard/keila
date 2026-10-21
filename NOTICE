@@ -1,11 +1,13 @@
 This is a modified version of Keila.
 
-Keila is Copyright Pentacent (Philipp Schmieder) and licensed under the
-GNU Affero General Public License, version 3 (see LICENSE.md).
+Keila is Copyright Philipp Schmieder Medien (Pentacent) and the Keila
+contributors, and licensed under the GNU Affero General Public License,
+version 3 (see LICENSE.md).
 Upstream source: https://github.com/pentacent/keila
 
 Modified by EklipseTech, August 2026 to October 2026. The modifications
-are licensed under the same terms (AGPL-3.0).
+are licensed under the same terms (AGPL-3.0). Each upstream file this fork
+changes carries a "Modified by EklipseTech" line; files it adds are its own.
 
 Changes from upstream:
 

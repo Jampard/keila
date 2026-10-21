@@ -1,3 +1,4 @@
+# Modified by EklipseTech, 2026; see NOTICE.
 defmodule KeilaWeb.AccountControllerTest do
   use KeilaWeb.ConnCase
   alias Keila.Auth

@@ -1,3 +1,4 @@
+# Modified by EklipseTech, 2026; see NOTICE.
 # This file is responsible for configuring your application
 # and its dependencies with the aid of the Mix.Config module.
 #

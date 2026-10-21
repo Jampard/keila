@@ -1,3 +1,4 @@
+# Modified by EklipseTech, 2026; see NOTICE.
 defmodule Keila.Auth do
   @moduledoc """
   Functions for authentication and authorization.

@@ -1,3 +1,4 @@
+# Modified by EklipseTech, 2026; see NOTICE.
 defmodule KeilaWeb.Endpoint do
   use Phoenix.Endpoint, otp_app: :keila
 

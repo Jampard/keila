@@ -1,3 +1,4 @@
+# Modified by EklipseTech, 2026; see NOTICE.
 defmodule KeilaWeb do
   @moduledoc """
   The entrypoint for defining your web interface, such
