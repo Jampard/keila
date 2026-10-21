@@ -5,7 +5,17 @@
 ### Added
 - Added optional OIDC SSO: sign in via one or more OpenID Connect providers, with an entitlement policy, a `pushed` policy fed by the platform's `/tenancy` push, and an OIDC-only mode (see `docs/oidc-sso.md`)
 - `KEILA_OIDC_<NAME>_ADMIN_VALUE` maps an IdP-held admin group to the Keila root role, reconciled on every sign-in (see `docs/oidc-sso.md`, Administrators)
-- `KEILA_PASSWORD` now updates the root user's password on every boot rather than only at first seed, so rotating the secret and restarting is sufficient
+- `KEILA_PASSWORD` now updates the root user's password on every boot rather than only at first seed, so rotating the secret and restarting is sufficient; a password the user schema refuses is logged and the old one stays
+- `/tenancy` push: one Account and Project per shop, members by `{issuer, sub}`, suspend and purge (see `docs/oidc-sso.md`, Tenancy push)
+- Secrets can be read from the file named by `<NAME>_FILE`; `DB_PASSWORD` supplies the database password apart from `DB_URL`
+- Every page links the source of the running version (`KEILA_SOURCE_URL`, `KEILA_SOURCE_REVISION`), also baked into the release at build time
+- `KEILA_HTTP_IP` binds the HTTP listener to one address
+
+### Security
+- Members of a pushed shop can no longer create, edit or delete senders: an SMTP sender names its own relay and From, which on a host with a no-auth loopback relay meant mail as any domain the relay signs
+- Project LiveViews re-check membership on every mount and a push disconnects the sockets of members it removes, so an open editor no longer outlives a removal, suspension or purge
+- A purge deletes the shop's uploaded files instead of leaving them publicly served
+- A sign-in the entitlement gate refuses also removes the root role granted through `ADMIN_VALUE`
 
 ## Version 0.30.3
 

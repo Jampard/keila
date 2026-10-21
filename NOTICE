@@ -14,7 +14,9 @@ Changes from upstream:
   OIDC-only mode. See docs/oidc-sso.md.
 - Tenancy push: PUT/GET /tenancy, which provisions one Account and Project
   per shop from the platform's push and decides who may sign in through
-  the `pushed` provider. See docs/oidc-sso.md.
+  the `pushed` provider. A pushed member cannot create or delete projects
+  or manage senders, and loses open editors with the shop. See
+  docs/oidc-sso.md.
 - Build and CI: flake.nix builds the deployed release
   (packages.<linux>.keila, a mixRelease that production runs as a native
   service) and a container image (packages.<linux>.image, nix/image.nix),
@@ -22,8 +24,10 @@ Changes from upstream:
   a nix/devenv development environment with a local kanidm identity
   provider. ops/Dockerfile is upstream's and is not the deployed build.
 - Secrets from files: SECRET_KEY_BASE, KEILA_PASSWORD, DB_PASSWORD,
-  MAILER_SMTP_PASSWORD, CAPTCHA_SECRET_KEY, HASHID_SALT and the OIDC client
-  secrets can each be read from the file named by <NAME>_FILE.
+  MAILER_SMTP_PASSWORD, CAPTCHA_SECRET_KEY, HCAPTCHA_SECRET_KEY,
+  HASHID_SALT, KEILA_TENANCY_SECRET and the OIDC client secrets can each
+  be read from the file named by <NAME>_FILE.
+- KEILA_HTTP_IP binds the HTTP listener to a single address.
 - Source link: every page of the web interface links the source code of
   the running version (KEILA_SOURCE_URL, KEILA_SOURCE_REVISION), as
   required by section 13 of the AGPL.
