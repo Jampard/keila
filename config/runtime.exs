@@ -364,6 +364,19 @@ if config_env() == :prod do
     """)
   end
 
+  # Behind a local reverse proxy, KEILA_HTTP_IP=127.0.0.1 keeps the app port (and /tenancy with
+  # it) off every other interface. Unset, the listener binds all of them, as upstream does.
+  case System.get_env("KEILA_HTTP_IP") do
+    ip when ip in [nil, ""] ->
+      :ok
+
+    ip ->
+      case :inet.parse_address(String.to_charlist(ip)) do
+        {:ok, address} -> config(:keila, KeilaWeb.Endpoint, http: [ip: address])
+        {:error, _} -> raise ArgumentError, "KEILA_HTTP_IP is not an IP address: #{inspect(ip)}"
+      end
+  end
+
   # Deployment
   config :keila,
     # Disable registration of new users via the UI

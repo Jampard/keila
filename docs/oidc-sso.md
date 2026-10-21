@@ -178,7 +178,10 @@ Every route needs `Authorization: Bearer <secret>` (401 `{"error":"unauthorised"
 otherwise). A malformed body, including one that is not JSON, is 422
 `{"error": "<field>: <why>"}` and applies nothing. A version at or below the
 last one applied for the slug is ignored. The route must never be on a public
-vhost.
+vhost. The app's own listener binds every interface unless
+`KEILA_HTTP_IP` names one (e.g. `127.0.0.1` behind a local reverse proxy),
+so a peer that can reach the app port directly reaches `/tenancy` without
+the proxy in between.
 
 Each slug is one shop: an Account, a Project group under it and a Project
 named after `name`, recorded in the `tenancies` table. Members join the
