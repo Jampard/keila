@@ -82,6 +82,10 @@ defmodule Keila.TenancyTest do
             {"a bare mail",
              &put_in(&1, ["members"], [%{"sub" => "s", "mail" => "ab", "role" => "merchant"}]),
              "members[0].mail: must be an address"},
+            {"an overlong sub",
+             &put_in(&1, ["members"], [
+               %{"sub" => String.duplicate("s", 256), "mail" => "a@b", "role" => "merchant"}
+             ]), "members[0].sub: must be at most 255 characters"},
             {"a blank sub",
              &put_in(&1, ["members"], [%{"sub" => " ", "mail" => "a@b", "role" => "merchant"}]),
              "members[0].sub: must be a non-empty string"},

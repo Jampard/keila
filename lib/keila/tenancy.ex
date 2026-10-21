@@ -150,6 +150,8 @@ defmodule Keila.Tenancy do
          {:ok, mail} <- text(raw["mail"], "#{at}.mail"),
          true <- String.contains?(mail, "@") || {:error, "#{at}.mail: must be an address"},
          {:ok, sub} <- text(raw["sub"], "#{at}.sub"),
+         true <-
+           String.length(sub) <= 255 || {:error, "#{at}.sub: must be at most 255 characters"},
          {:ok, role} <- one_of(raw["role"], "#{at}.role", @roles) do
       {:ok, %{sub: sub, mail: mail, role: role}}
     end
