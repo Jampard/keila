@@ -56,6 +56,7 @@ defmodule Keila.Auth.OidcLoginTest do
         "iss" => @staff_issuer,
         "sub" => "sub-alice",
         "email" => "alice@example.com",
+        "email_verified" => true,
         "keila_role" => "keila_users"
       },
       overrides
@@ -202,16 +203,23 @@ defmodule Keila.Auth.OidcLoginTest do
   end
 
   @tag :oidc
-  test "an explicit email_verified false is refused while an absent claim provisions" do
+  test "only an email_verified of true or \"true\" provisions" do
     put_config(providers: [staff: @staff])
     before = counts()
 
+    for verified <- [false, "false", nil, 1, "yes"] do
+      assert {verified, {:error, :email_not_verified}} ==
+               {verified,
+                Login.handle_claims(:staff, staff_claims(%{"email_verified" => verified}))}
+    end
+
     assert {:error, :email_not_verified} =
-             Login.handle_claims(:staff, staff_claims(%{"email_verified" => false}))
+             Login.handle_claims(:staff, Map.delete(staff_claims(), "email_verified"))
 
     assert counts() == before
 
-    assert {:ok, %User{}} = Login.handle_claims(:staff, staff_claims())
+    assert {:ok, %User{}} =
+             Login.handle_claims(:staff, staff_claims(%{"email_verified" => "true"}))
   end
 
   @tag :oidc

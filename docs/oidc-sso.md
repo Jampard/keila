@@ -262,8 +262,10 @@ is sufficient; the seed script itself still runs only on an empty database.
 
 On first successful sign-in, a new Keila user is created with no password
 set, and is pre-activated (no activation email is sent — the IdP has
-already verified the address; `email_verified: false` in the claims refuses
-the sign-in instead, see below).
+already verified the address). Provisioning therefore requires
+`email_verified` to be `true` (or the string `"true"`); an absent or any
+other value refuses the sign-in, so a self-service IdP account cannot claim
+someone else's address. kanidm sends it for an account's primary mail.
 
 An IdP-managed account (one with an identity from a configured provider)
 cannot set a local password, neither through a password reset nor on the
@@ -294,7 +296,7 @@ Refusals an operator might see in the logs
 | `:provisioning_disabled` | the provider's gate (`_ENTITLEMENT_CLAIM` / `_ENTITLEMENT_VALUE`) is unset |
 | `:not_entitled` | the entitlement check failed, or a `pushed` provider was never pushed this `sub` |
 | `:missing_email` | no `email` claim on first sign-in (no existing identity to fall back to) |
-| `:email_not_verified` | `email_verified` claim is explicitly `false` |
+| `:email_not_verified` | `email_verified` claim on first sign-in is absent or not `true` |
 | `:email_exists` | the claimed email already belongs to a different Keila account |
 | `:provisioning_failed` | user/identity row could not be created and no concurrent winner was found either |
 | `:unknown_provider` | the `:provider` in the request does not match a currently valid, enabled provider |

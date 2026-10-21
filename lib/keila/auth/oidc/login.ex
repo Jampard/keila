@@ -141,12 +141,10 @@ defmodule Keila.Auth.Oidc.Login do
   defp email(%{"email" => email}) when is_binary(email) and email != "", do: {:ok, email}
   defp email(_claims), do: {:error, :missing_email}
 
-  # Only an affirmative `true` counts: several IdPs serialize this claim as a
-  # string, and `"false"` must not read as verified.
-  defp email_verified(%{"email_verified" => verified}) when verified != true,
-    do: {:error, :email_not_verified}
-
-  defp email_verified(_claims), do: :ok
+  # Provisioning claims an address in Keila, so the IdP must vouch for it: an absent claim
+  # would let a self-service IdP account squat someone else's mail. Some IdPs send a string.
+  defp email_verified(%{"email_verified" => verified}) when verified in [true, "true"], do: :ok
+  defp email_verified(_claims), do: {:error, :email_not_verified}
 
   defp email_available(email) do
     from(u in User, where: fragment("lower(?) = lower(?)", u.email, ^email))
