@@ -173,7 +173,7 @@ defmodule Keila.Files do
   """
   @spec delete_project_file(Project.id(), File.id()) :: :ok | {:error, term()}
   def delete_project_file(project_id, uuid) do
-    with file = %File{} <- get_project_files(project_id, uuid),
+    with file = %File{} <- get_project_file(project_id, uuid),
          adapter <- get_adapter(file.adapter),
          :ok <- adapter.delete(file) do
       Repo.delete_all(from(f in File, where: f.uuid == ^uuid))

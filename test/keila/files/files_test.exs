@@ -39,6 +39,21 @@ defmodule Keila.FilesTest do
   end
 
   @tag :files
+  test "delete_project_file/2 deletes only a file of that project" do
+    project = insert!(:project, group: insert!(:group))
+    other = insert!(:project, group: insert!(:group))
+
+    {:ok, file} =
+      Files.store_file(project.id, @test_file, filename: "keila.png", type: "image/png")
+
+    assert :ok == Files.delete_project_file(other.id, file.uuid)
+    assert Files.get_file(file.uuid)
+
+    assert :ok == Files.delete_project_file(project.id, file.uuid)
+    assert nil == Files.get_file(file.uuid)
+  end
+
+  @tag :files
   test "detect file usage in campaigns" do
     group = insert!(:group)
     project = insert!(:project, group: group)
