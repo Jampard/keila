@@ -423,6 +423,22 @@ defmodule Keila.Auth.OidcLoginTest do
   end
 
   @tag :oidc
+  test "a linked user the gate now refuses loses their sessions and open LiveViews" do
+    put_config(providers: [staff: @staff])
+    assert {:ok, user} = Login.handle_claims(:staff, staff_claims())
+    {:ok, session} = Auth.create_token(%{scope: "web.session", user_id: user.id})
+    {:ok, other} = Auth.create_token(%{scope: "auth.update_email", user_id: user.id})
+    KeilaWeb.Endpoint.subscribe(KeilaWeb.AuthSession.live_socket_id(user.id))
+
+    assert {:error, :not_entitled} =
+             Login.handle_claims(:staff, staff_claims(%{"keila_role" => "revoked"}))
+
+    assert nil == Auth.find_token(session.key, "web.session")
+    assert Auth.find_token(other.key, "auth.update_email")
+    assert_receive %Phoenix.Socket.Broadcast{event: "disconnect"}
+  end
+
+  @tag :oidc
   test "without admin_value nobody is granted and an existing grant is left alone" do
     put_config(providers: [staff: @staff])
 

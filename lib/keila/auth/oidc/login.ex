@@ -52,25 +52,36 @@ defmodule Keila.Auth.Oidc.Login do
 
   defp do_handle_claims(provider, claims) do
     with {:ok, iss, sub} <- identity(provider, claims),
-         :ok <- gate(provider, claims) |> revoke_admin_if_refused(provider, iss, sub),
+         :ok <- gate(provider, claims) |> revoke_if_refused(provider, iss, sub),
          {:ok, user} <- find_or_provision(provider, iss, sub, claims),
          :ok <- sync_admin(provider, user, claims) do
       {:ok, user}
     end
   end
 
-  # Someone the gate now refuses never reaches sync_admin, so a provider that owns admin takes
-  # it back here: an IdP that drops both groups at once must not leave the root role behind.
-  defp revoke_admin_if_refused(:ok, _provider, _iss, _sub), do: :ok
+  # A linked user the gate now refuses has lost access at the IdP, so what Keila still holds for
+  # them goes too: their sessions and open LiveViews, and the root role from a provider that owns
+  # admin (sync_admin is never reached; an IdP dropping both groups at once must not leave it).
+  defp revoke_if_refused(:ok, _provider, _iss, _sub), do: :ok
 
-  defp revoke_admin_if_refused(refused, provider, iss, sub) do
-    with true <- owns_admin?(provider),
-         %OidcIdentity{user_id: user_id} <- Repo.get_by(OidcIdentity, issuer: iss, subject: sub) do
-      reconcile_admin(Auth.get_user(user_id), false)
+  defp revoke_if_refused(refused = {:error, :not_entitled}, provider, iss, sub) do
+    case Repo.get_by(OidcIdentity, issuer: iss, subject: sub) do
+      %OidcIdentity{user_id: user_id} ->
+        Repo.delete_all(
+          from(t in Auth.Token, where: t.user_id == ^user_id and t.scope == "web.session")
+        )
+
+        KeilaWeb.AuthSession.disconnect_live_sockets(user_id)
+        if owns_admin?(provider), do: reconcile_admin(Auth.get_user(user_id), false)
+
+      nil ->
+        :ok
     end
 
     refused
   end
+
+  defp revoke_if_refused(refused, _provider, _iss, _sub), do: refused
 
   defp owns_admin?(provider) do
     Oidc.policy(provider) == :entitlement and Oidc.admin_value(provider) not in [nil, ""]
