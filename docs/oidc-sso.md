@@ -190,6 +190,13 @@ the project debits that shop's Account alone. A member is matched by
 `{pushed issuer, sub}`; a new sub becomes a password-less User and the push
 owns its email (a mail held by another User is 422).
 
+Pushed members cannot create or delete projects, nor create, edit or
+delete senders (403; the sender list stays readable): a shop's senders are
+the operator's to provision, since an SMTP sender names its own relay and
+From. Whoever a push takes the shop from has their open LiveViews
+disconnected, and every project LiveView re-checks membership when it
+(re)mounts.
+
 - `live`: the pushed members hold the project; anyone the push dropped loses it.
 - `suspended`: the data stays, every pushed member loses access.
 - `purged`: the Account and its group are deleted, which cascades to the
