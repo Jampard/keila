@@ -333,4 +333,36 @@ defmodule Keila.Auth.OidcConfigTest do
       Oidc.refuse_stale_config!(%{"KEILA_OIDC_MERCHANT_TENANT_CLAIM" => "groups"})
     end
   end
+
+  @tag :oidc
+  test "boot refuses a provider set that is ambiguous or half-wired" do
+    assert :ok = Oidc.refuse_unsafe_providers!([staff: @staff, merchant: @merchant], "secret")
+    assert :ok = Oidc.refuse_unsafe_providers!([staff: @staff], nil)
+
+    assert_raise ArgumentError, ~r/share the issuer/, fn ->
+      Oidc.refuse_unsafe_providers!(
+        [staff: @staff, merchant: Keyword.put(@merchant, :issuer, @staff[:issuer])],
+        nil
+      )
+    end
+
+    assert_raise ArgumentError, ~r/share the name staff/, fn ->
+      Oidc.refuse_unsafe_providers!([staff: @staff, staff: @staff], nil)
+    end
+
+    assert_raise ArgumentError, ~r/STAFF_CACERTFILE/, fn ->
+      Oidc.refuse_unsafe_providers!(
+        [staff: Keyword.put(@staff, :cacertfile, "/nonexistent/ca.pem")],
+        nil
+      )
+    end
+
+    second_pushed = Keyword.put(@merchant, :issuer, "https://other-shop.example.com/oidc")
+
+    for providers <- [[], [staff: @staff], [merchant: @merchant, other: second_pushed]] do
+      assert_raise ArgumentError, ~r/KEILA_TENANCY_SECRET/, fn ->
+        Oidc.refuse_unsafe_providers!(providers, "secret")
+      end
+    end
+  end
 end

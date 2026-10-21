@@ -63,6 +63,46 @@ defmodule Keila.Auth.Oidc do
     end
   end
 
+  @doc """
+  Refuses boot on a provider set that would run ambiguous or half-wired: two providers with
+  one name or one issuer (identities are keyed on the issuer, so a shared one lets either
+  provider's subjects stand for the other's), a `CACERTFILE` that cannot be read, or a tenancy
+  secret without exactly one `pushed` provider to admit the members it pushes.
+  """
+  @spec refuse_unsafe_providers!(keyword(), String.t() | nil) :: :ok
+  def refuse_unsafe_providers!(providers, tenancy_secret) do
+    refuse_repeated!(Keyword.keys(providers), "name")
+    refuse_repeated!(Enum.map(providers, fn {_name, opts} -> opts[:issuer] end), "issuer")
+
+    Enum.each(providers, fn {name, opts} ->
+      path = opts[:cacertfile]
+
+      if path && not File.regular?(path) do
+        raise ArgumentError,
+              "KEILA_OIDC_#{String.upcase(to_string(name))}_CACERTFILE=#{path} is not a readable file"
+      end
+    end)
+
+    pushed = for {name, opts} <- providers, opts[:policy] == :pushed, do: name
+
+    if tenancy_secret not in [nil, ""] and length(pushed) != 1 do
+      raise ArgumentError,
+            "KEILA_TENANCY_SECRET is set but #{length(pushed)} providers have POLICY=pushed; exactly one must"
+    end
+
+    :ok
+  end
+
+  defp refuse_repeated!(values, what) do
+    case for {value, n} <- Enum.frequencies(values), n > 1, do: to_string(value) do
+      [] ->
+        :ok
+
+      repeated ->
+        raise ArgumentError, "OIDC providers share the #{what} #{Enum.join(repeated, ", ")}"
+    end
+  end
+
   @spec provider_names() :: [atom()]
   def provider_names do
     Enum.map(providers(), fn {name, _opts} -> name end)

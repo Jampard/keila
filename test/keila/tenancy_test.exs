@@ -369,6 +369,14 @@ defmodule Keila.TenancyTest do
                Login.handle_claims(:merchant, %{"sub" => "s1", "email" => "x@y.z"})
     end
 
+    test "a shop member stays a pushed User when the pushed provider is gone from the config" do
+      push!("acme", 1, "live", [member("s1")])
+      user_id = user_of("s1")
+      Application.put_env(:keila, Oidc, providers: [])
+
+      assert Tenancy.pushed_user?(user_id)
+    end
+
     test "a pushed User has a personal Account of its own, holding no shop project" do
       push!("acme", 1, "live", [member("s1")])
       user_id = user_of("s1")

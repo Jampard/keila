@@ -53,15 +53,28 @@ defmodule Keila.Tenancy do
     |> Repo.exists?()
   end
 
+  # A member of any shop counts whatever the OIDC config now says, so the guards built on this
+  # cannot silently open when the pushed provider is renamed, removed or duplicated.
   @spec pushed_user?(User.id()) :: boolean()
   def pushed_user?(user_id) do
-    case merchant_issuer() do
-      {:ok, iss} ->
-        Repo.exists?(from(i in OidcIdentity, where: i.user_id == ^user_id and i.issuer == ^iss))
+    shop_member? =
+      from(t in Tenancy,
+        join: p in Project,
+        on: p.id == t.project_id,
+        join: ug in UserGroup,
+        on: ug.group_id == p.group_id,
+        where: ug.user_id == ^user_id
+      )
+      |> Repo.exists?()
 
-      _error ->
-        false
-    end
+    shop_member? or
+      case merchant_issuer() do
+        {:ok, iss} ->
+          Repo.exists?(from(i in OidcIdentity, where: i.user_id == ^user_id and i.issuer == ^iss))
+
+        _error ->
+          false
+      end
   end
 
   @doc """

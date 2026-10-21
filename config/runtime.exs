@@ -504,10 +504,27 @@ if oidc_provider_names != [] do
       end
     end)
 
+  try do
+    Keila.Auth.Oidc.refuse_unsafe_providers!(
+      oidc_providers,
+      Keila.SecretEnv.get("KEILA_TENANCY_SECRET")
+    )
+  rescue
+    e in ArgumentError ->
+      exit_from_exception.(e, "Refusing to boot with an unsafe OIDC configuration.")
+  end
+
   config :keila, Keila.Auth.Oidc,
     providers: oidc_providers,
     oidc_only: System.get_env("KEILA_OIDC_ONLY") not in [nil, "", "0", "false", "FALSE"]
 else
+  try do
+    Keila.Auth.Oidc.refuse_unsafe_providers!([], Keila.SecretEnv.get("KEILA_TENANCY_SECRET"))
+  rescue
+    e in ArgumentError ->
+      exit_from_exception.(e, "Refusing to boot with an unsafe OIDC configuration.")
+  end
+
   # Outside prod an unconfigured OIDC is the normal case, so the notice would be pure noise.
   if config_env() == :prod do
     Logger.warning("""

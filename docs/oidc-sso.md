@@ -73,6 +73,11 @@ the deploy instead of running without its provider. There is no partial state fo
 provider — it is either fully valid or entirely absent from
 `Keila.Auth.Oidc.providers/0`.
 
+Boot is also refused (`Keila.Auth.Oidc.refuse_unsafe_providers!/2`) when two
+providers share a name or an issuer (identities are keyed on the issuer),
+when a `CACERTFILE` is not a readable file, and when `KEILA_TENANCY_SECRET`
+is set without exactly one `pushed` provider.
+
 ### Worked example: two providers
 
 ```
