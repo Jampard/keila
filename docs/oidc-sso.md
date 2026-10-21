@@ -234,7 +234,9 @@ procedure above.
 admin to Keila admin: a user whose entitlement claim also carries this
 value is granted the root role on sign-in. The grant **reconciles on every
 sign-in, both ways** — leaving the admin group at the IdP revokes
-`administer_keila` at that user's next login. A provider configuring
+`administer_keila` at that user's next login, and so does a sign-in the
+entitlement gate refuses (someone dropped from both groups at once keeps
+no root role behind). A provider configuring
 `ADMIN_VALUE` therefore owns root-role membership for every user who signs
 in through it, including a grant made by hand; with the variable unset, no
 grant is ever made *or removed*. It has no effect on a `pushed`

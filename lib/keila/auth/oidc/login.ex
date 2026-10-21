@@ -52,11 +52,28 @@ defmodule Keila.Auth.Oidc.Login do
 
   defp do_handle_claims(provider, claims) do
     with {:ok, iss, sub} <- identity(provider, claims),
-         :ok <- gate(provider, claims),
+         :ok <- gate(provider, claims) |> revoke_admin_if_refused(provider, iss, sub),
          {:ok, user} <- find_or_provision(provider, iss, sub, claims),
          :ok <- sync_admin(provider, user, claims) do
       {:ok, user}
     end
+  end
+
+  # Someone the gate now refuses never reaches sync_admin, so a provider that owns admin takes
+  # it back here: an IdP that drops both groups at once must not leave the root role behind.
+  defp revoke_admin_if_refused(:ok, _provider, _iss, _sub), do: :ok
+
+  defp revoke_admin_if_refused(refused, provider, iss, sub) do
+    with true <- owns_admin?(provider),
+         %OidcIdentity{user_id: user_id} <- Repo.get_by(OidcIdentity, issuer: iss, subject: sub) do
+      reconcile_admin(Auth.get_user(user_id), false)
+    end
+
+    refused
+  end
+
+  defp owns_admin?(provider) do
+    Oidc.policy(provider) == :entitlement and Oidc.admin_value(provider) not in [nil, ""]
   end
 
   # The issuer comes from OUR configuration, never from the claims: `oidcc` has
@@ -190,13 +207,13 @@ defmodule Keila.Auth.Oidc.Login do
   # Root-role membership tracks `admin_value` on every sign-in, both ways: a provider that
   # configures it OWNS admin for its users, so leaving the group at the IdP revokes on next login.
   defp sync_admin(provider, user, claims) do
-    case {Oidc.policy(provider), Oidc.admin_value(provider)} do
-      {:entitlement, value} when is_binary(value) and value != "" ->
-        entitled? = Claims.entitled?(claims, Oidc.entitlement_claim(provider), value)
-        reconcile_admin(user, entitled?)
+    if owns_admin?(provider) do
+      entitled? =
+        Claims.entitled?(claims, Oidc.entitlement_claim(provider), Oidc.admin_value(provider))
 
-      _other ->
-        :ok
+      reconcile_admin(user, entitled?)
+    else
+      :ok
     end
   end
 

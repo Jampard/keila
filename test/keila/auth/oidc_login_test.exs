@@ -401,6 +401,20 @@ defmodule Keila.Auth.OidcLoginTest do
   end
 
   @tag :oidc
+  test "an admin the gate now refuses loses administer_keila along with the sign-in" do
+    put_config(providers: [staff: Keyword.put(@staff, :admin_value, "keila_admins")])
+
+    elevated = staff_claims(%{"keila_role" => ["keila_users", "keila_admins"]})
+    assert {:ok, user} = Login.handle_claims(:staff, elevated)
+    assert admin?(user.id)
+
+    assert {:error, :not_entitled} =
+             Login.handle_claims(:staff, staff_claims(%{"keila_role" => []}))
+
+    refute admin?(user.id)
+  end
+
+  @tag :oidc
   test "without admin_value nobody is granted and an existing grant is left alone" do
     put_config(providers: [staff: @staff])
 
