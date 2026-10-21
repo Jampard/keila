@@ -1,5 +1,6 @@
 defmodule Keila.TenancyTest do
   use Keila.DataCase, async: false
+  use Keila.FileCase
 
   alias Keila.Accounts
   alias Keila.Accounts.Account
@@ -204,6 +205,36 @@ defmodule Keila.TenancyTest do
 
       assert {:ok, :ignored} = push!("acme", 2, "live", [member("s1")])
       assert {:error, :not_found} = Tenancy.read("acme")
+    end
+
+    test "purged deletes the shop's uploads, which the cascade would only orphan", %{dir: dir} do
+      push!("acme", 1, "live", [member("s1")])
+
+      {:ok, file} =
+        Keila.Files.store_file(project_of("acme"), "test/keila/files/keila.png",
+          filename: "keila.png",
+          type: "image/png"
+        )
+
+      assert [_stored] = File.ls!(dir)
+
+      assert {:ok, :applied} = push!("acme", 2, "purged", [])
+      assert nil == Keila.Files.get_file(file.uuid)
+      assert [] == File.ls!(dir)
+    end
+
+    test "suspended keeps the shop's uploads", %{dir: dir} do
+      push!("acme", 1, "live", [member("s1")])
+
+      {:ok, file} =
+        Keila.Files.store_file(project_of("acme"), "test/keila/files/keila.png",
+          filename: "keila.png",
+          type: "image/png"
+        )
+
+      assert {:ok, :applied} = push!("acme", 2, "suspended", [member("s1")])
+      assert Keila.Files.get_file(file.uuid)
+      assert [_stored] = File.ls!(dir)
     end
 
     test "a higher version re-births a purged slug fresh" do

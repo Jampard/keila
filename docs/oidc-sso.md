@@ -190,7 +190,8 @@ owns its email (a mail held by another User is 422).
 - `live`: the pushed members hold the project; anyone the push dropped loses it.
 - `suspended`: the data stays, every pushed member loses access.
 - `purged`: the Account and its group are deleted, which cascades to the
-  Project and its data. Users are never deleted. The row stays as a
+  Project and its data; its uploaded files are deleted from storage once
+  the purge has committed. Users are never deleted. The row stays as a
   tombstone at that version, so a later push only re-creates the shop fresh
   with a higher version.
 

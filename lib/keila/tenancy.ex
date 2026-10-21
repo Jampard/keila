@@ -184,14 +184,18 @@ defmodule Keila.Tenancy do
           :ignored
         else
           before = member_ids(held, iss)
+          files = if next.state == "purged", do: file_ids(held), else: []
           held = held |> transition(next, iss) |> Repo.update!()
-          {:applied, before -- member_ids(held, iss)}
+          {:applied, before -- member_ids(held, iss), files}
         end
       end)
       |> case do
         # Open LiveViews of whoever lost the shop reconnect and meet KeilaWeb.LiveAuth.
-        {:ok, {:applied, revoked}} ->
+        # files.project_id is ON DELETE nilify, so a purge leaves the uploads, still served at
+        # their URLs; they go only once the purge has committed.
+        {:ok, {:applied, revoked, files}} ->
           Enum.each(revoked, &KeilaWeb.AuthSession.disconnect_live_sockets/1)
+          Enum.each(files, &Keila.Files.delete_file/1)
           {:ok, :applied}
 
         other ->
@@ -199,6 +203,11 @@ defmodule Keila.Tenancy do
       end
     end
   end
+
+  defp file_ids(%Tenancy{project_id: nil}), do: []
+
+  defp file_ids(%Tenancy{project_id: project_id}),
+    do: project_id |> Keila.Files.get_project_files() |> Enum.map(& &1.uuid)
 
   defp member_ids(%Tenancy{project_id: nil}, _iss), do: []
 
