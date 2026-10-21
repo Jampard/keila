@@ -1,5 +1,6 @@
 defmodule KeilaWeb.ContactImportLive do
   use KeilaWeb, :live_view
+  on_mount {KeilaWeb.LiveAuth, :project}
 
   @impl true
   def mount(_params, session, socket) do

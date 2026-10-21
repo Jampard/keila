@@ -1,5 +1,6 @@
 defmodule KeilaWeb.FormEditLive do
   use KeilaWeb, :live_view
+  on_mount {KeilaWeb.LiveAuth, :project}
 
   alias Keila.Mailings.DoubleOptInMessage
   alias Keila.Mailings.WelcomeMessage

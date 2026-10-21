@@ -1,5 +1,6 @@
 defmodule KeilaWeb.CreateUserLive do
   use KeilaWeb, :live_view
+  on_mount {KeilaWeb.LiveAuth, :admin}
   alias Keila.Auth.User
 
   @impl true

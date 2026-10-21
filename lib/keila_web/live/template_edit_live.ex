@@ -1,5 +1,6 @@
 defmodule KeilaWeb.TemplateEditLive do
   use KeilaWeb, :live_view
+  on_mount {KeilaWeb.LiveAuth, :project}
   alias Keila.Templates.{Template, StyleTemplate, HybridTemplate}
   alias Keila.Mailings.Renderer
 

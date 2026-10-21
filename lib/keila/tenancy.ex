@@ -183,12 +183,27 @@ defmodule Keila.Tenancy do
         if next.version <= held.version do
           :ignored
         else
-          held |> transition(next, iss) |> Repo.update!()
-          :applied
+          before = member_ids(held, iss)
+          held = held |> transition(next, iss) |> Repo.update!()
+          {:applied, before -- member_ids(held, iss)}
         end
       end)
+      |> case do
+        # Open LiveViews of whoever lost the shop reconnect and meet KeilaWeb.LiveAuth.
+        {:ok, {:applied, revoked}} ->
+          Enum.each(revoked, &KeilaWeb.AuthSession.disconnect_live_sockets/1)
+          {:ok, :applied}
+
+        other ->
+          other
+      end
     end
   end
+
+  defp member_ids(%Tenancy{project_id: nil}, _iss), do: []
+
+  defp member_ids(%Tenancy{project_id: project_id}, iss),
+    do: project_id |> project_group_id() |> pushed_member_ids(iss)
 
   # A slug never seen starts as a tombstone at version 0, so a first push is just a transition.
   defp lock(slug) do

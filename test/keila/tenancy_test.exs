@@ -41,6 +41,8 @@ defmodule Keila.TenancyTest do
 
   defp project_of(slug), do: Repo.get_by!(Row, slug: slug).project_id
 
+  defp socket_id(user_id), do: KeilaWeb.AuthSession.live_socket_id(user_id)
+
   defp encode(body), do: Jason.encode!(body)
 
   describe "parse/1 is strict and names the refused field" do
@@ -122,6 +124,29 @@ defmodule Keila.TenancyTest do
       assert {:ok, :ignored} = push!("acme", 3, "live", [member("s2")])
       assert {:ok, :ignored} = push!("acme", 2, "live", [member("s2")])
       assert subs("acme") == ["s1"]
+    end
+
+    test "whoever a push takes the shop from has their LiveView sockets disconnected" do
+      push!("acme", 1, "live", [member("s1"), member("s2")])
+      [kept, dropped] = Enum.map(["s1", "s2"], &user_of/1)
+      for id <- [kept, dropped], do: KeilaWeb.Endpoint.subscribe(socket_id(id))
+
+      push!("acme", 2, "live", [member("s1")])
+      assert_receive %Phoenix.Socket.Broadcast{topic: topic, event: "disconnect"}
+      assert topic == socket_id(dropped)
+      refute_receive %Phoenix.Socket.Broadcast{event: "disconnect"}
+
+      push!("acme", 3, "suspended", [member("s1")])
+      assert_receive %Phoenix.Socket.Broadcast{topic: topic, event: "disconnect"}
+      assert topic == socket_id(kept)
+
+      push!("acme", 4, "live", [member("s1")])
+      push!("acme", 5, "purged", [])
+      assert_receive %Phoenix.Socket.Broadcast{topic: topic, event: "disconnect"}
+      assert topic == socket_id(kept)
+
+      assert {:ok, :ignored} = push!("acme", 5, "purged", [])
+      refute_receive %Phoenix.Socket.Broadcast{event: "disconnect"}
     end
 
     test "a member absent from a newer state loses the project and keeps the User" do

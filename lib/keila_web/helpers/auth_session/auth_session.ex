@@ -22,7 +22,23 @@ defmodule KeilaWeb.AuthSession do
     conn
     |> clear_session()
     |> put_session(:token, token.key)
+    |> put_session(:live_socket_id, live_socket_id(user_id))
   end
+
+  @doc """
+  Id shared by every LiveView socket of the user with the given `user_id`.
+  """
+  @spec live_socket_id(Keila.Auth.User.id()) :: String.t()
+  def live_socket_id(user_id), do: "users_sessions:#{user_id}"
+
+  @doc """
+  Disconnects every LiveView socket of the user with the given `user_id`.
+
+  The client reconnects at once, and `KeilaWeb.LiveAuth` then checks the user's access afresh.
+  """
+  @spec disconnect_live_sockets(Keila.Auth.User.id()) :: :ok | {:error, term()}
+  def disconnect_live_sockets(user_id),
+    do: KeilaWeb.Endpoint.broadcast(live_socket_id(user_id), "disconnect", %{})
 
   @doc """
   Clears the session and deletes session token if present.

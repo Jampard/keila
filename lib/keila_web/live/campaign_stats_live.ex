@@ -1,5 +1,6 @@
 defmodule KeilaWeb.CampaignStatsLive do
   use KeilaWeb, :live_view
+  on_mount {KeilaWeb.LiveAuth, :project}
   require Keila
   alias Keila.{Mailings, Tracking}
 

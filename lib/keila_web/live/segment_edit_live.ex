@@ -1,5 +1,6 @@
 defmodule KeilaWeb.SegmentEditLive do
   use KeilaWeb, :live_view
+  on_mount {KeilaWeb.LiveAuth, :project}
   alias Keila.Contacts
   alias Keila.Mailings
 
