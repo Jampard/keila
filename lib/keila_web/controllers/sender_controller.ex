@@ -6,6 +6,10 @@ defmodule KeilaWeb.SenderController do
   import Ecto.Changeset
   import Phoenix.LiveView.Controller
 
+  # A pushed member's senders are the operator's to provision (docs/oidc-sso.md, Tenancy push).
+  plug KeilaWeb.Tenancy.RefusePushedMemberPlug
+       when action in [:new, :edit, :delete_confirmation, :delete]
+
   plug :put_resource
        when action not in [
               :index,
@@ -21,6 +25,7 @@ defmodule KeilaWeb.SenderController do
 
     conn
     |> assign(:senders, senders)
+    |> assign(:manage_senders?, not Keila.Tenancy.pushed_user?(conn.assigns.current_user.id))
     |> render("index.html")
   end
 

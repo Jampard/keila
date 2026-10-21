@@ -4,7 +4,11 @@
       {gettext("Senders")}
     </h1>
     <div class="flex-grow flex flex-row-reverse justify-end gap-4 sm:flex-row">
-      <a href={Routes.sender_path(@conn, :new, @current_project.id)} class="button button--large">
+      <a
+        :if={@manage_senders?}
+        href={Routes.sender_path(@conn, :new, @current_project.id)}
+        class="button button--large"
+      >
         {render_icon(:document_add)}
         {gettext("Create")}
       </a>
@@ -27,6 +31,7 @@
       </p>
       <br />
       <a
+        :if={@manage_senders?}
         href={Routes.sender_path(@conn, :edit, @current_project.id, sender.id)}
         class="button button--large"
       >

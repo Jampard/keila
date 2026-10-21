@@ -169,5 +169,39 @@ defmodule KeilaWeb.TenancyControllerTest do
       assert member |> get(Routes.project_path(member, :new)) |> response(403)
       assert member |> get(Routes.project_path(member, :delete, a)) |> response(403)
     end
+
+    # An SMTP sender names its own relay and From: through the host's no-auth loopback relay
+    # that would be mail as any domain the relay signs.
+    test "cannot create, edit or delete a sender, but sees the shop's", %{
+      member: member,
+      a_project: a
+    } do
+      sender = insert!(:mailings_sender, project_id: a, name: "provisioned")
+
+      index = member |> get(Routes.sender_path(member, :index, a)) |> html_response(200)
+      assert index =~ "provisioned"
+      refute index =~ Routes.sender_path(member, :new, a)
+      refute index =~ Routes.sender_path(member, :edit, a, sender.id)
+
+      assert member |> get(Routes.sender_path(member, :new, a)) |> response(403)
+      assert member |> get(Routes.sender_path(member, :edit, a, sender.id)) |> response(403)
+
+      assert member
+             |> get(Routes.sender_path(member, :delete_confirmation, a, sender.id))
+             |> response(403)
+
+      assert member
+             |> delete(Routes.sender_path(member, :delete, a, sender.id), %{
+               "sender" => %{"delete_confirmation" => "provisioned"}
+             })
+             |> response(403)
+
+      assert Keila.Mailings.get_sender(sender.id)
+    end
+
+    test "the project page does not offer to create a sender", %{member: member, a_project: a} do
+      page = member |> get(Routes.project_path(member, :show, a)) |> html_response(200)
+      refute page =~ Routes.sender_path(member, :new, a)
+    end
   end
 end

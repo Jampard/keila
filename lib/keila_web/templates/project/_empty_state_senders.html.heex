@@ -5,13 +5,19 @@
   <h2 class="text-xl sm:text-2xl">
     {gettext("Let’s get started!")}
   </h2>
-  {gettext_md("""
-  Before you can get started, you need to create a *sender*.
+  <%= if @manage_senders? do %>
+    {gettext_md("""
+    Before you can get started, you need to create a *sender*.
 
-  In the sender settings, you specify the email address
-  and the name from which to send your emails.
-  """)}
-  <p>
+    In the sender settings, you specify the email address
+    and the name from which to send your emails.
+    """)}
+  <% else %>
+    <p>
+      {gettext("Your sender is set up for you; it appears here once it is ready.")}
+    </p>
+  <% end %>
+  <p :if={@manage_senders?}>
     <a
       class="button button--cta button--large"
       href={Routes.sender_path(@conn, :new, @current_project.id)}

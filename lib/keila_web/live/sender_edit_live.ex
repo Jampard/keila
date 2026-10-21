@@ -32,6 +32,19 @@ defmodule KeilaWeb.SenderEditLive do
 
   @impl true
   def handle_event("save", %{"sender" => sender_params}, socket) do
+    # The controller refuses pushed members already; this covers a socket that outlives that check.
+    if Keila.Tenancy.pushed_user?(socket.assigns.current_user.id),
+      do: {:noreply, socket},
+      else: save_sender(socket, sender_params)
+  end
+
+  def handle_event("send_verification_email", _, socket) do
+    Keila.Mailings.send_sender_verification_email(socket.assigns.sender.id)
+
+    {:noreply, socket}
+  end
+
+  defp save_sender(socket, sender_params) do
     case create_or_update_sender(socket, sender_params) do
       {:ok, _sender} ->
         {:noreply,
@@ -46,12 +59,6 @@ defmodule KeilaWeb.SenderEditLive do
          socket
          |> assign(:changeset, changeset)}
     end
-  end
-
-  def handle_event("send_verification_email", _, socket) do
-    Keila.Mailings.send_sender_verification_email(socket.assigns.sender.id)
-
-    {:noreply, socket}
   end
 
   defp create_or_update_sender(socket, params) do
