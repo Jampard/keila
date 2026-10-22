@@ -141,6 +141,86 @@ let
     '';
   };
 
+  # A test-only dep's precompiled NIF, downloaded at compile time; the hashes are its checksum.exs.
+  lazyHtmlNif =
+    let
+      cpu = pkgs.stdenv.hostPlatform.parsed.cpu.name;
+    in
+    pkgs.fetchurl {
+      name = "lazy_html-nif-2.16-${cpu}-linux-gnu-0.1.10.tar.gz";
+      url = "https://github.com/dashbitco/lazy_html/releases/download/v0.1.10/lazy_html-nif-2.16-${cpu}-linux-gnu-0.1.10.tar.gz";
+      hash =
+        {
+          x86_64 = "sha256-Ni0JKbP6OJqQ8rT08VnF/KWjiyigoVUjqSZ3LRU9dBo=";
+          aarch64 = "sha256-7uMelfgv3uwP5K/8PmmEBhMtRrvv0fwPUQzakMHPmwk=";
+        }
+        .${cpu};
+    };
+
+  # The kanidm-tagged tests need a live realm and are skipped here (test/test_helper.exs).
+  test = beam.mixRelease {
+    pname = "keila-test";
+    inherit version elixir;
+    mixEnv = "test";
+    src = lib.fileset.toSource {
+      root = ../.;
+      fileset = lib.fileset.difference (lib.fileset.unions [
+        ../mix.exs
+        ../mix.lock
+        ../.formatter.exs
+        ../config
+        ../lib
+        ../priv
+        ../test
+      ]) (lib.fileset.unions [
+        (lib.fileset.maybeMissing ../priv/cldr)
+        ../test/extra
+      ]);
+    };
+    mixFodDeps = beam.fetchMixDeps {
+      pname = "keila-mix-deps-test";
+      inherit version elixir;
+      mixEnv = "test";
+      src = lib.fileset.toSource {
+        root = ../.;
+        fileset = lib.fileset.unions [
+          ../mix.exs
+          ../mix.lock
+          ../config
+        ];
+      };
+      hash = "sha256-Z1wQEivZId4bR/YXN14nvGvtF6V8eyDjfMnOyEfmnsk=";
+    };
+
+    nativeBuildInputs = [ pkgs.postgresql ];
+    env = {
+      RUSTLER_PRECOMPILED_GLOBAL_CACHE_PATH = mjmlNif;
+      DB_URL = "ecto://postgres@127.0.0.1:5432/keila_test";
+    };
+
+    postPatch = ''
+      export ELIXIR_MAKE_CACHE_DIR="$TMPDIR/elixir_make"
+      install -Dm644 ${lazyHtmlNif} "$ELIXIR_MAKE_CACHE_DIR/${lazyHtmlNif.name}"
+      mkdir -p priv/cldr/locales
+      ${lib.concatStrings (
+        lib.mapAttrsToList (locale: file: "cp ${file} priv/cldr/locales/${locale}.json\n") cldrLocales
+      )}
+    '';
+
+    buildPhase = ''
+      runHook preBuild
+      export PGDATA="$TMPDIR/pg" PGHOST="$TMPDIR"
+      initdb -U postgres --auth=trust >/dev/null
+      pg_ctl -o "-k $TMPDIR -h 127.0.0.1 -p 5432" -l "$TMPDIR/pg.log" -w start
+      mix do loadpaths --no-deps-check + compile --warnings-as-errors + format --check-formatted + test
+      pg_ctl -m fast stop
+      runHook postBuild
+    '';
+
+    installPhase = "touch $out";
+    postFixup = "";
+  };
+
   image = pkgs.dockerTools.buildLayeredImage {
     name = "keila";
     tag = if revision == null then "dev" else revision;
@@ -204,5 +284,5 @@ let
   };
 in
 {
-  inherit keila image;
+  inherit keila image test;
 }

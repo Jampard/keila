@@ -66,6 +66,10 @@
           inherit (image) keila image;
           default = image.image;
         };
+        checks = nixpkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
+          inherit (image) test;
+          release = image.keila;
+        };
       }
     );
 }
