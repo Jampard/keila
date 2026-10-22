@@ -50,12 +50,12 @@ defmodule KeilaWeb.LiveAuthTest do
     assert {:cont, _socket} = mount(:admin, %{"token" => root_token.key})
   end
 
-  test "a new auth session carries the user's live_socket_id" do
+  test "a new auth session carries the user's live_socket_id", %{user: user} do
     conn =
       build_conn()
       |> Plug.Test.init_test_session(%{})
-      |> KeilaWeb.AuthSession.start_auth_session(42)
+      |> KeilaWeb.AuthSession.start_auth_session(user.id)
 
-    assert get_session(conn, :live_socket_id) == KeilaWeb.AuthSession.live_socket_id(42)
+    assert get_session(conn, :live_socket_id) == KeilaWeb.AuthSession.live_socket_id(user.id)
   end
 end

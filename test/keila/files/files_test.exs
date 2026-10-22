@@ -41,8 +41,9 @@ defmodule Keila.FilesTest do
 
   @tag :files
   test "delete_project_file/2 deletes only a file of that project" do
-    project = insert!(:project, group: insert!(:group))
-    other = insert!(:project, group: insert!(:group))
+    group = insert!(:group)
+    project = insert!(:project, group: group)
+    other = insert!(:project, group: group)
 
     {:ok, file} =
       Files.store_file(project.id, @test_file, filename: "keila.png", type: "image/png")

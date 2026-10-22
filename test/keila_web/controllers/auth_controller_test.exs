@@ -21,6 +21,7 @@ defmodule KeilaWeb.AuthControllerTest do
     end
 
     @tag :auth_controller
+    @tag :network
     test "allows registration with valid params and captcha", %{conn: conn} do
       conn =
         post(conn, Routes.auth_path(conn, :register),
@@ -129,6 +130,7 @@ defmodule KeilaWeb.AuthControllerTest do
     end
 
     @tag :auth_controller
+    @tag :network
     test "sends email for existing users", %{conn: conn} do
       user = insert!(:user)
 
@@ -144,6 +146,7 @@ defmodule KeilaWeb.AuthControllerTest do
     end
 
     @tag :auth_controller
+    @tag :network
     test "shows no error for non-existent users", %{conn: conn} do
       conn =
         post(conn, Routes.auth_path(conn, :reset),
@@ -167,6 +170,7 @@ defmodule KeilaWeb.AuthControllerTest do
     end
 
     @tag :auth_controller
+    @tag :network
     test "sends no email for an account the IdP manages", %{conn: conn} do
       issuer = "https://idp.example.com/oauth2/openid/keila"
       user = insert!(:user)
