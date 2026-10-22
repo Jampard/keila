@@ -157,8 +157,8 @@ let
         .${cpu};
     };
 
-  # The sandbox has no network: kanidm-tagged tests skip themselves (test/test_helper.exs), and
-  # :network ones (hCaptcha's live siteverify) are excluded below.
+  # No network in the sandbox: kanidm tests skip themselves (test_helper.exs), :network ones are excluded.
+  # --max-cases: a many-core builder otherwise outruns config/test.exs' pool_size of 16.
   test = beam.mixRelease {
     pname = "keila-test";
     inherit version elixir;
@@ -213,7 +213,7 @@ let
       export PGDATA="$TMPDIR/pg" PGHOST="$TMPDIR"
       initdb -U postgres --auth=trust >/dev/null
       pg_ctl -o "-k $TMPDIR -h 127.0.0.1 -p 5432" -l "$TMPDIR/pg.log" -w start
-      mix do loadpaths --no-deps-check + compile --warnings-as-errors + format --check-formatted + test --exclude network
+      mix do loadpaths --no-deps-check + compile --warnings-as-errors + format --check-formatted + test --exclude network --max-cases 8
       pg_ctl -m fast stop
       runHook postBuild
     '';
