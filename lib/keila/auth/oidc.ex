@@ -197,6 +197,9 @@ defmodule Keila.Auth.Oidc do
   @spec cacertfile(atom() | binary()) :: binary() | nil
   def cacertfile(name), do: fetch(name, :cacertfile)
 
+  @spec end_session_url(atom() | binary() | nil) :: binary() | nil
+  def end_session_url(name), do: fetch(name, :end_session_url)
+
   @doc """
   HTTP options for every call `oidcc` makes to `name` — discovery, JWKS, the
   token exchange and userinfo.

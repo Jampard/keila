@@ -500,6 +500,7 @@ if oidc_provider_names != [] do
             )
             |> put_if_not_empty.(:admin_value, System.get_env(prefix <> "ADMIN_VALUE"))
             |> put_if_not_empty.(:cacertfile, System.get_env(prefix <> "CACERTFILE"))
+            |> put_if_not_empty.(:end_session_url, System.get_env(prefix <> "END_SESSION_URL"))
 
           [{key, opts}]
       end
@@ -548,6 +549,8 @@ else
       same claim gain Keila admin, reconciled on every sign-in)
     - KEILA_OIDC_<NAME>_CACERTFILE (PEM to verify the IdP against, for a private CA;
       it replaces the system trust store for this provider rather than adding to it)
+    - KEILA_OIDC_<NAME>_END_SESSION_URL (where sign-out sends the browser to end the
+      IdP session too; for kanidm, https://<idm>/ui/logout)
 
     Set KEILA_OIDC_ONLY to disable password login, registration and password
     resets once at least one OIDC provider is configured.

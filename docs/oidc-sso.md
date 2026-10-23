@@ -56,6 +56,7 @@ internal provider key) has its own set of `KEILA_OIDC_<NAME>_*` variables.
 | `KEILA_OIDC_<NAME>_ADMIN_VALUE` | no | unset (no OIDC user gains admin) | `entitlement` policy only — see Administrators below |
 | `KEILA_OIDC_<NAME>_TENANT_PREFIX`, `…_TENANT_CLAIM` | must be unset | — | leftovers of the removed `tenant_spn` policy; **either one refuses boot** |
 | `KEILA_OIDC_<NAME>_CACERTFILE` | for an IdP behind a private CA | unset (system trust store) | PEM path — see Private certificate authorities below |
+| `KEILA_OIDC_<NAME>_END_SESSION_URL` | no | unset (sign-out ends only Keila's session) | see Sign-out below |
 | `KEILA_TENANCY_SECRET` | to accept the tenancy push | unset (`/tenancy*` answers 404) | bearer secret; `KEILA_TENANCY_SECRET_FILE` reads it from a file — see Tenancy push below |
 | `KEILA_OIDC_ONLY` | no | off | any value other than unset, empty, `0`, `false` or `FALSE` turns it on (so `False`, `no`, `1`, `true` all turn it on) — see OIDC-only mode below |
 
@@ -234,6 +235,20 @@ Two things to know:
   provider is down), the break-glass procedure is: unset `KEILA_OIDC_ONLY`
   and restart the instance. There is no admin toggle for this, and no way to
   carve out a single account.
+
+## Sign-out
+
+Signing out always deletes Keila's own session. If the session began at a
+provider with `KEILA_OIDC_<NAME>_END_SESSION_URL` set, Keila then redirects
+the browser there, so the IdP session ends too and the next sign-in shows
+the IdP's login form instead of passing straight through. Which provider
+began the session is recorded at sign-in (`:oidc_provider` in the session).
+
+For kanidm, set it to `https://<idm>/ui/logout`. kanidm 1.11 advertises no
+`end_session_endpoint` and ignores `id_token_hint`, but a top-level GET to
+`/ui/logout` carries its `SameSite=Lax` session cookie, revokes that
+session and lands on kanidm's login page. The browser does not come back
+to Keila afterwards.
 
 ## Administrators
 

@@ -248,9 +248,12 @@ defmodule KeilaWeb.AuthController do
 
   @spec logout(Plug.Conn.t(), map) :: Plug.Conn.t()
   def logout(conn, _params) do
-    conn
-    |> end_auth_session()
-    |> redirect(to: Routes.auth_path(conn, :login))
+    idp_logout = conn |> get_session(:oidc_provider) |> Auth.Oidc.end_session_url()
+    conn = end_auth_session(conn)
+
+    if idp_logout,
+      do: redirect(conn, external: idp_logout),
+      else: redirect(conn, to: Routes.auth_path(conn, :login))
   end
 
   defp render_404(conn) do

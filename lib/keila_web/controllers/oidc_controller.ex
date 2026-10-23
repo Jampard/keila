@@ -111,6 +111,7 @@ defmodule KeilaWeb.OidcController do
       {:ok, user} ->
         conn
         |> start_auth_session(user.id)
+        |> put_session(:oidc_provider, provider)
         |> redirect(to: Routes.project_path(conn, :index))
 
       {:error, reason} ->

@@ -180,6 +180,24 @@ defmodule KeilaWeb.OidcControllerTest do
   end
 
   @tag :oidc
+  test "signing out of a kanidm session sends the browser to kanidm's logout", %{
+    conn: conn,
+    kanidm: kanidm,
+    admin: admin
+  } do
+    end_session_url = kanidm.base_url <> "/ui/logout"
+    configure_merchant(kanidm, admin, end_session_url: end_session_url)
+    %{person: person} = provision_member(kanidm, admin)
+
+    conn = complete_login(conn, kanidm, "merchant", person)
+    token = get_session(conn, :token)
+    conn = conn |> recycle() |> get(Routes.auth_path(conn, :logout))
+
+    assert redirected_to(conn, 302) == end_session_url
+    refute Auth.find_token(token, "web.session")
+  end
+
+  @tag :oidc
   test "signing in twice writes no user or identity: the push already did", %{
     conn: conn,
     kanidm: kanidm,

@@ -92,6 +92,19 @@ defmodule Keila.Auth.OidcConfigTest do
   end
 
   @tag :oidc
+  test "the end-session URL is per provider and absent unless configured" do
+    url = "https://idp.example.com/ui/logout"
+
+    put_config(
+      providers: [staff: Keyword.put(@staff, :end_session_url, url), merchant: @merchant]
+    )
+
+    assert Oidc.end_session_url("staff") == url
+    assert Oidc.end_session_url(:merchant) == nil
+    assert Oidc.end_session_url(nil) == nil
+  end
+
+  @tag :oidc
   test "oidc_only? is false when no valid provider exists" do
     put_config(oidc_only: true)
     refute Oidc.oidc_only?()
