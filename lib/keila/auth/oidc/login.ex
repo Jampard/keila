@@ -41,10 +41,7 @@ defmodule Keila.Auth.Oidc.Login do
   """
   @spec idp_managed?(User.id()) :: boolean()
   def idp_managed?(user_id) do
-    issuers =
-      Oidc.provider_names()
-      |> Enum.map(&Oidc.issuer/1)
-      |> Enum.filter(&is_binary/1)
+    issuers = Oidc.issuers()
 
     issuers != [] and
       Repo.exists?(from(i in OidcIdentity, where: i.user_id == ^user_id and i.issuer in ^issuers))
@@ -130,8 +127,18 @@ defmodule Keila.Auth.Oidc.Login do
     case {Repo.get_by(OidcIdentity, issuer: iss, subject: sub), Oidc.policy(provider)} do
       {%OidcIdentity{user_id: user_id}, :pushed} -> live_member(user_id)
       {%OidcIdentity{user_id: user_id}, _policy} -> {:ok, Auth.get_user(user_id)}
-      {nil, :pushed} -> {:error, :not_entitled}
+      {nil, :pushed} -> relink_member(iss, sub, claims)
       {nil, _policy} -> provision(iss, sub, claims)
+    end
+  end
+
+  defp relink_member(iss, sub, claims) do
+    with {:ok, email} <- email(claims),
+         :ok <- email_verified(claims),
+         {:ok, user} <- Keila.Tenancy.relink(iss, sub, email, same_subject: true) do
+      live_member(user.id)
+    else
+      _refused -> {:error, :not_entitled}
     end
   end
 

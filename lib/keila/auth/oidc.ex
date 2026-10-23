@@ -147,6 +147,11 @@ defmodule Keila.Auth.Oidc do
   @spec issuer(atom() | binary()) :: binary() | nil
   def issuer(name), do: fetch(name, :issuer)
 
+  @spec issuers() :: [binary()]
+  def issuers do
+    provider_names() |> Enum.map(&issuer/1) |> Enum.filter(&is_binary/1)
+  end
+
   @spec client_id(atom() | binary()) :: binary() | nil
   def client_id(name), do: fetch(name, :client_id)
 

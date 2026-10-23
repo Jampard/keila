@@ -43,14 +43,40 @@ defmodule Keila.Tenancy do
 
   @spec holds_live_shop?(User.id()) :: boolean()
   def holds_live_shop?(user_id) do
+    user_id |> shop_memberships() |> where([t], t.state == "live") |> Repo.exists?()
+  end
+
+  defp shop_memberships(user_id) do
     from(t in Tenancy,
       join: p in Project,
       on: p.id == t.project_id,
       join: ug in UserGroup,
       on: ug.group_id == p.group_id,
-      where: t.state == "live" and ug.user_id == ^user_id
+      where: ug.user_id == ^user_id
     )
-    |> Repo.exists?()
+  end
+
+  @doc """
+  Re-keys the identity of a User the gate pushed onto `{iss, sub}` once its OIDC client was renamed (keila#3).
+
+  Only a User holding a shop membership, with no identity under `iss` and exactly one under an issuer no
+  provider is configured with any more; anyone else stays refused. `same_subject: true` also demands the
+  stale identity's `sub`, as sign-in does: there the mail comes from the IdP, not from the gate.
+  """
+  @spec relink(String.t(), String.t(), String.t(), keyword()) :: {:ok, User.t()} | :none
+  def relink(iss, sub, mail, opts \\ []) do
+    with %User{} = user <-
+           Repo.one(from(u in User, where: fragment("lower(?) = lower(?)", u.email, ^mail))),
+         true <- user.id |> shop_memberships() |> Repo.exists?(),
+         identities = Repo.all(from(i in OidcIdentity, where: i.user_id == ^user.id)),
+         false <- Enum.any?(identities, &(&1.issuer == iss)),
+         [stale] <- Enum.reject(identities, &(&1.issuer in Oidc.issuers())),
+         true <- not Keyword.get(opts, :same_subject, false) or stale.subject == sub do
+      stale |> OidcIdentity.changeset(%{issuer: iss, subject: sub}) |> Repo.update!()
+      {:ok, user}
+    else
+      _not_relinkable -> :none
+    end
   end
 
   # A member of any shop counts whatever the OIDC config now says, so the guards built on this
@@ -325,7 +351,14 @@ defmodule Keila.Tenancy do
   defp upsert_member(%{sub: sub, mail: mail}, iss, field) do
     case Repo.get_by(OidcIdentity, issuer: iss, subject: sub) do
       %OidcIdentity{user_id: user_id} -> update_mail(Auth.get_user(user_id), mail, field)
-      nil -> create_member(iss, sub, mail, field)
+      nil -> relinked_or_created(iss, sub, mail, field)
+    end
+  end
+
+  defp relinked_or_created(iss, sub, mail, field) do
+    case relink(iss, sub, mail) do
+      {:ok, user} -> user
+      :none -> create_member(iss, sub, mail, field)
     end
   end
 

@@ -406,6 +406,94 @@ defmodule Keila.TenancyTest do
     end
   end
 
+  describe "a renamed merchant client (keila#3)" do
+    @renamed "https://shop.example.com/oidc-renamed"
+
+    defp rename_client do
+      Application.put_env(:keila, Oidc,
+        providers: [merchant: Keyword.put(@merchant, :issuer, @renamed)]
+      )
+    end
+
+    defp identity_of(user_id), do: Repo.all(from(i in OidcIdentity, where: i.user_id == ^user_id))
+
+    test "the next push re-keys each member onto the new issuer, keeping the User and the shop" do
+      push!("acme", 1, "live", [member("s1")])
+      user_id = user_of("s1")
+      users = Repo.aggregate(User, :count)
+
+      rename_client()
+
+      assert {:ok, :applied} = push!("acme", 2, "live", [member("s1")])
+      assert [%OidcIdentity{issuer: @renamed, subject: "s1"}] = identity_of(user_id)
+      assert users == Repo.aggregate(User, :count)
+      assert subs("acme") == ["s1"]
+    end
+
+    test "the member's next sign-in re-keys them with no push, when the sub matches" do
+      push!("acme", 1, "live", [member("s1")])
+      user_id = user_of("s1")
+      rename_client()
+
+      assert {:error, :not_entitled} =
+               Login.handle_claims(:merchant, %{
+                 "sub" => "s2",
+                 "email" => "s1@shop.example.com",
+                 "email_verified" => true
+               })
+
+      assert [%OidcIdentity{issuer: @issuer}] = identity_of(user_id)
+
+      assert {:ok, %User{id: ^user_id}} =
+               Login.handle_claims(:merchant, %{
+                 "sub" => "s1",
+                 "email" => "s1@shop.example.com",
+                 "email_verified" => true
+               })
+
+      assert [%OidcIdentity{issuer: @renamed, subject: "s1"}] = identity_of(user_id)
+    end
+
+    test "a User the gate never pushed keeps the refusal, even with an identity under a gone issuer" do
+      stranger = insert!(:user, email: "s1@shop.example.com")
+
+      %{issuer: "https://gone.example.com/oidc", subject: "s1", user_id: stranger.id}
+      |> OidcIdentity.changeset()
+      |> Repo.insert!()
+
+      rename_client()
+
+      assert {:error, {:malformed, "members[0].mail: belongs to another user"}} =
+               push!("acme", 1, "live", [member("s1")])
+
+      assert {:error, :not_entitled} =
+               Login.handle_claims(:merchant, %{
+                 "sub" => "s1",
+                 "email" => "s1@shop.example.com",
+                 "email_verified" => true
+               })
+
+      assert [%OidcIdentity{issuer: "https://gone.example.com/oidc"}] = identity_of(stranger.id)
+    end
+
+    test "a pushed member whose only identity is under a still-configured issuer is not moved" do
+      push!("acme", 1, "live", [member("s1")])
+      user_id = user_of("s1")
+
+      Application.put_env(:keila, Oidc,
+        providers: [
+          merchant: Keyword.put(@merchant, :issuer, @renamed),
+          staff: Keyword.merge(@merchant, policy: :entitlement, client_id: "keila-staff")
+        ]
+      )
+
+      assert {:error, {:malformed, "members[0].mail: belongs to another user"}} =
+               push!("acme", 2, "live", [member("s1")])
+
+      assert [%OidcIdentity{issuer: @issuer}] = identity_of(user_id)
+    end
+  end
+
   test "a first push in state suspended holds the shop with no member" do
     assert {:ok, :applied} = push!("acme", 1, "suspended", [member("s1")])
 
