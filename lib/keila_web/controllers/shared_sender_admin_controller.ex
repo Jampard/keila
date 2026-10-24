@@ -1,3 +1,4 @@
+# Modified by EklipseTech, 2026; see NOTICE.
 defmodule KeilaWeb.SharedSenderAdminController do
   use KeilaWeb, :controller
   alias Keila.{Mailings, Mailings.SharedSender, Mailings.Sender.Config, Mailings.SenderAdapters}
@@ -127,11 +128,11 @@ defmodule KeilaWeb.SharedSenderAdminController do
     do: conn
 
   defp authorize(conn, _),
-    do: conn |> put_status(404) |> halt()
+    do: conn |> put_status(404) |> text("Not Found") |> halt()
 
   defp put_resource(conn = %{path_params: %{"id" => id}}, _) do
     case Mailings.get_shared_sender(id) do
-      nil -> conn |> put_status(404) |> halt()
+      nil -> conn |> put_status(404) |> text("Not Found") |> halt()
       shared_sender -> conn |> assign(:shared_sender, shared_sender)
     end
   end

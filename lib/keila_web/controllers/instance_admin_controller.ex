@@ -1,3 +1,4 @@
+# Modified by EklipseTech, 2026; see NOTICE.
 defmodule KeilaWeb.InstanceAdminController do
   use KeilaWeb, :controller
 
@@ -26,7 +27,7 @@ defmodule KeilaWeb.InstanceAdminController do
   defp authorize(conn, _) do
     case conn.assigns.is_admin? do
       true -> conn
-      false -> conn |> put_status(404) |> halt()
+      false -> conn |> put_status(404) |> text("Not Found") |> halt()
     end
   end
 end

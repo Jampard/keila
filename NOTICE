@@ -30,6 +30,9 @@ Changes from upstream:
   HASHID_SALT, KEILA_TENANCY_SECRET and the OIDC client secrets can each
   be read from the file named by <NAME>_FILE.
 - KEILA_HTTP_IP binds the HTTP listener to a single address.
+- A request for something the user cannot reach (a project, a contact, a
+  campaign, an admin page...) answers 404 Not Found; upstream set the
+  status without sending a response, which surfaced as a 500.
 - Source link: every page of the web interface links the source code of
   the running version (KEILA_SOURCE_URL, KEILA_SOURCE_REVISION), as
   required by section 13 of the AGPL.

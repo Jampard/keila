@@ -1,3 +1,4 @@
+# Modified by EklipseTech, 2026; see NOTICE.
 defmodule KeilaWeb.ProjectControllerTest do
   use KeilaWeb.ConnCase
 
@@ -77,6 +78,6 @@ defmodule KeilaWeb.ProjectControllerTest do
       |> with_login(user: other_user)
       |> get(Routes.project_path(conn, :show, project.id))
 
-    assert conn.status == 404
+    assert response(conn, 404) == "Not Found"
   end
 end

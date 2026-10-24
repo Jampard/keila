@@ -1,3 +1,4 @@
+# Modified by EklipseTech, 2026; see NOTICE.
 defmodule KeilaWeb.TemplateController do
   use KeilaWeb, :controller
   alias Keila.Templates
@@ -175,6 +176,7 @@ defmodule KeilaWeb.TemplateController do
       nil ->
         conn
         |> put_status(404)
+        |> text("Not Found")
         |> halt()
 
       template ->

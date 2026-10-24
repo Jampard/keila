@@ -1,3 +1,4 @@
+# Modified by EklipseTech, 2026; see NOTICE.
 defmodule KeilaWeb.FormController do
   use KeilaWeb, :controller
   require Keila
@@ -98,6 +99,7 @@ defmodule KeilaWeb.FormController do
       nil ->
         conn
         |> put_status(404)
+        |> text("Not Found")
         |> halt()
 
       form ->

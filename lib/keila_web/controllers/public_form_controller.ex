@@ -1,3 +1,4 @@
+# Modified by EklipseTech, 2026; see NOTICE.
 defmodule KeilaWeb.PublicFormController do
   use KeilaWeb, :controller
   require Logger
@@ -246,7 +247,7 @@ defmodule KeilaWeb.PublicFormController do
       |> put_meta(:title, gettext("Unsubscribing ..."))
       |> render("unsubscribe.html")
     else
-      conn |> put_status(:not_found) |> halt()
+      conn |> put_status(:not_found) |> text("Not Found") |> halt()
     end
   end
 
@@ -282,6 +283,7 @@ defmodule KeilaWeb.PublicFormController do
       nil ->
         conn
         |> put_status(404)
+        |> text("Not Found")
         |> halt()
 
       form ->
@@ -301,7 +303,7 @@ defmodule KeilaWeb.PublicFormController do
         conn |> assign(:form, form) |> render_failure_or_redirect() |> halt()
 
       true ->
-        conn |> put_status(404) |> halt()
+        conn |> put_status(404) |> text("Not Found") |> halt()
     end
   end
 

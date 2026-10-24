@@ -1,3 +1,4 @@
+# Modified by EklipseTech, 2026; see NOTICE.
 defmodule KeilaWeb.ProjectPlug do
   @moduledoc """
   This Plug adds a `current_project` assign from the `:project_id` path param.
@@ -6,6 +7,7 @@ defmodule KeilaWeb.ProjectPlug do
   the project or if the project doesn‘t exist.
   """
   import Plug.Conn
+  import Phoenix.Controller, only: [text: 2]
   alias Keila.Projects
 
   def init(_), do: []
@@ -15,7 +17,7 @@ defmodule KeilaWeb.ProjectPlug do
     user = conn.assigns.current_user
 
     case Projects.get_user_project(user.id, project_id) do
-      nil -> conn |> put_status(404) |> halt()
+      nil -> conn |> put_status(404) |> text("Not Found") |> halt()
       project -> assign(conn, :current_project, project)
     end
   end

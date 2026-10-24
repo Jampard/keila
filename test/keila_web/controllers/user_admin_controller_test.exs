@@ -1,3 +1,4 @@
+# Modified by EklipseTech, 2026; see NOTICE.
 defmodule KeilaWeb.UserAdminControllerTest do
   use KeilaWeb.ConnCase
 
@@ -8,7 +9,7 @@ defmodule KeilaWeb.UserAdminControllerTest do
 
       conn = with_login(conn, user: user)
       conn = get(conn, Routes.user_admin_path(conn, :index))
-      assert conn.status == 404
+      assert response(conn, 404) == "Not Found"
 
       conn = with_login(conn, user: root)
       conn = get(conn, Routes.user_admin_path(conn, :index))
@@ -46,7 +47,7 @@ defmodule KeilaWeb.UserAdminControllerTest do
       params = %{"email" => user.email, "password" => user.password}
       conn = post(conn, Routes.user_admin_path(conn, :create, user: params))
 
-      assert conn.status == 404
+      assert response(conn, 404) == "Not Found"
     end
   end
 
