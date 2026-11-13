@@ -1,4 +1,3 @@
-# Modified by EklipseTech, 2026; see NOTICE.
 defmodule KeilaWeb.CampaignController do
   use KeilaWeb, :controller
   alias Keila.{Contacts, Mailings, Templates}
@@ -306,10 +305,7 @@ defmodule KeilaWeb.CampaignController do
 
     case Mailings.get_project_campaign(project_id, campaign_id) do
       nil ->
-        conn
-        |> put_status(404)
-        |> text("Not Found")
-        |> halt()
+        raise KeilaWeb.NotFoundError
 
       campaign ->
         assign(conn, :campaign, campaign)

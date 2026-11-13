@@ -193,7 +193,7 @@ defmodule KeilaWeb.AuthControllerOidcOnlyTest do
 
       put_oidc_config(@valid_provider_config)
 
-      conn = get(conn, Routes.user_admin_path(conn, :impersonate, user.id))
+      conn = post(conn, Routes.user_admin_path(conn, :impersonate, user.id))
       assert redirected_to(conn, 302) == "/"
 
       conn = recycle(conn) |> get("/")

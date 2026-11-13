@@ -20,8 +20,8 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
         # nixpkgs moved elixir/erlang/hex from mixRelease/fetchMixDeps call args to
-        # callPackage-scope params; beam27Packages.overrideScope sets them instead.
-        scopedBeam = pkgs.beam27Packages.overrideScope (final: prev: { elixir = prev.elixir_1_18; });
+        # callPackage-scope params; beam29Packages.overrideScope sets them instead.
+        scopedBeam = pkgs.beam29Packages.overrideScope (final: prev: { elixir = prev.elixir_1_20; });
         beam = scopedBeam // {
           mixRelease =
             args:

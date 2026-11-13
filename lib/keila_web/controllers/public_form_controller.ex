@@ -1,4 +1,3 @@
-# Modified by EklipseTech, 2026; see NOTICE.
 defmodule KeilaWeb.PublicFormController do
   use KeilaWeb, :controller
   require Logger
@@ -216,25 +215,8 @@ defmodule KeilaWeb.PublicFormController do
     end
   end
 
-  # DEPRECATED: This implementation is deprecated and will be removed in a future version
-  def unsubscribe(conn, %{"project_id" => project_id, "contact_id" => contact_id}) do
-    form = Contacts.get_project_forms(project_id) |> List.first() || @default_unsubscribe_form
-    contact = Contacts.get_project_contact(project_id, contact_id)
-
-    if requires_confirmation?(conn, nil) do
-      conn
-      |> assign(:form, form)
-      |> assign(:confirmation_message, gettext("Unsubscribing ..."))
-      |> assign(
-        :confirmation_action_message,
-        gettext("Please confirm that you want to unsubscribe.")
-      )
-      |> assign(:confirmation_action_cta, gettext("Unsubscribe"))
-      |> put_meta(:title, gettext("Unsubscribing ..."))
-      |> render_confirmation()
-    else
-      perform_contact_unsubscribe(conn, form, contact)
-    end
+  defp unsubscribe_from_message(_conn, _form, _project_id, nil, _hmac) do
+    raise KeilaWeb.NotFoundError
   end
 
   defp unsubscribe_from_message(conn, form, project_id, message, hmac) do
@@ -247,21 +229,8 @@ defmodule KeilaWeb.PublicFormController do
       |> put_meta(:title, gettext("Unsubscribing ..."))
       |> render("unsubscribe.html")
     else
-      conn |> put_status(:not_found) |> text("Not Found") |> halt()
+      raise KeilaWeb.NotFoundError
     end
-  end
-
-  defp perform_contact_unsubscribe(conn, form, contact) do
-    if contact && contact.status != :unsubscribed do
-      Keila.Contacts.update_contact_status(contact.id, :unsubscribed)
-      Keila.Tracking.log_event("unsubscribe", contact.id, %{})
-    end
-
-    conn
-    |> assign(:form, form)
-    |> assign(:mode, :full)
-    |> put_meta(:title, gettext("Unsubscribing ..."))
-    |> render("unsubscribe.html")
   end
 
   defp requires_confirmation?(conn, datetime) do
@@ -281,10 +250,7 @@ defmodule KeilaWeb.PublicFormController do
 
     case Contacts.get_form(form_id) do
       nil ->
-        conn
-        |> put_status(404)
-        |> text("Not Found")
-        |> halt()
+        raise KeilaWeb.NotFoundError
 
       form ->
         assign(conn, :form, form)
@@ -303,7 +269,7 @@ defmodule KeilaWeb.PublicFormController do
         conn |> assign(:form, form) |> render_failure_or_redirect() |> halt()
 
       true ->
-        conn |> put_status(404) |> text("Not Found") |> halt()
+        raise KeilaWeb.NotFoundError
     end
   end
 

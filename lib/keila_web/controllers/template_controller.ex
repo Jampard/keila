@@ -1,4 +1,3 @@
-# Modified by EklipseTech, 2026; see NOTICE.
 defmodule KeilaWeb.TemplateController do
   use KeilaWeb, :controller
   alias Keila.Templates
@@ -174,10 +173,7 @@ defmodule KeilaWeb.TemplateController do
 
     case Templates.get_project_template(project_id, template_id) do
       nil ->
-        conn
-        |> put_status(404)
-        |> text("Not Found")
-        |> halt()
+        raise KeilaWeb.NotFoundError
 
       template ->
         assign(conn, :template, template)

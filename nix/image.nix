@@ -6,8 +6,8 @@
 }:
 let
   inherit (pkgs) lib;
-  elixir = beam.elixir_1_18;
-  version = "0.30.3";
+  elixir = beam.elixir_1_20;
+  version = "0.40.2";
   home = "/opt/app";
   port = 4000;
 
@@ -40,7 +40,7 @@ let
       (
         locale: hash:
         pkgs.fetchurl {
-          url = "https://raw.githubusercontent.com/elixir-cldr/cldr/v2.47.0/priv/cldr/locales/${locale}.json";
+          url = "https://raw.githubusercontent.com/elixir-cldr/cldr/v2.47.5/priv/cldr/locales/${locale}.json";
           inherit hash;
         }
       )
@@ -52,6 +52,7 @@ let
         hu = "sha256-quLGT1sPY4bvGkn9rZNAKu88X+OinCqZtD+7gkElHwY=";
         it = "sha256-yv/rwZmZzhmlrKmkyaWyJAhqh1My1wCIEpK6o4Vv2eM=";
         pt = "sha256-7hY8NYRkEtn9iE+JVWrR2zhFwrl1f3JScqbtzviH1Qc=";
+        sv = "sha256-tJnPHbD6KFo/Xw+hqR+Oj2Qm56kqt9IaDiAIh/LFZlU=";
       };
 
   mixFodDeps = beam.fetchMixDeps {
@@ -65,7 +66,7 @@ let
         ../config
       ];
     };
-    hash = "sha256-4huudt8UH2GtRbFl2OseXX/ZRBfEJJ/wWHfFZGZzCKU=";
+    hash = "sha256-WQo8OtU3lVuELlRgMHHfSlC38Yo6iJmmXXwVuKaiVMc=";
   };
 
   npmDeps = pkgs.fetchNpmDeps {
@@ -73,21 +74,21 @@ let
     src = ../assets;
     # @editorjs/editorjs is a git dependency of upstream's fork; its install scripts are not run.
     forceGitDeps = true;
-    hash = "sha256-jDFHIeqoKCW3OgqNHgXsbVlJcuGD++bkpWMxSRVJ6Ec=";
+    hash = "sha256-i3SwiBe17X1MG4JcVrdFw3MQFBdWTylv86yNrpG+gEo=";
   };
 
   # mjml's NIF is precompiled and downloaded at compile time; the hashes are its checksum-Elixir.Mjml.Native.exs.
   mjmlNif =
     let
-      file = "libmjml_nif-v5.3.1-nif-2.16-${pkgs.stdenv.hostPlatform.parsed.cpu.name}-unknown-linux-gnu.so.tar.gz";
+      file = "libmjml_nif-v6.0.0-nif-2.16-${pkgs.stdenv.hostPlatform.parsed.cpu.name}-unknown-linux-gnu.so.tar.gz";
     in
     pkgs.linkFarm "mjml-nif" {
       ${file} = pkgs.fetchurl {
-        url = "https://github.com/adoptoposs/mjml_nif/releases/download/v5.3.1/${file}";
+        url = "https://github.com/adoptoposs/mjml_nif/releases/download/v6.0.0/${file}";
         hash =
           {
-            x86_64 = "sha256-VV/ZTNHkhc0A6umjl+KRS99Mv6Jrs1KNyLjeWMVyLfA=";
-            aarch64 = "sha256-cFfmHBFTmK67PNx6eKJ/REHrO3i63c15Iu1AxLy410Q=";
+            x86_64 = "sha256-RCyIz+Xk9dAWmOrrvuSy+VJrpguSMf9D6mIe3Wbiknw=";
+            aarch64 = "sha256-+UasIJCOe7APrkYFPoxqgW3/ockSuRsbRIT/EKTnkEo=";
           }
           .${pkgs.stdenv.hostPlatform.parsed.cpu.name};
       };
@@ -147,12 +148,12 @@ let
       cpu = pkgs.stdenv.hostPlatform.parsed.cpu.name;
     in
     pkgs.fetchurl {
-      name = "lazy_html-nif-2.16-${cpu}-linux-gnu-0.1.10.tar.gz";
-      url = "https://github.com/dashbitco/lazy_html/releases/download/v0.1.10/lazy_html-nif-2.16-${cpu}-linux-gnu-0.1.10.tar.gz";
+      name = "lazy_html-nif-2.16-${cpu}-linux-gnu-0.1.13.tar.gz";
+      url = "https://github.com/dashbitco/lazy_html/releases/download/v0.1.13/lazy_html-nif-2.16-${cpu}-linux-gnu-0.1.13.tar.gz";
       hash =
         {
-          x86_64 = "sha256-Ni0JKbP6OJqQ8rT08VnF/KWjiyigoVUjqSZ3LRU9dBo=";
-          aarch64 = "sha256-7uMelfgv3uwP5K/8PmmEBhMtRrvv0fwPUQzakMHPmwk=";
+          x86_64 = "sha256-4LbnTj2ulV/sL4qqMGxTWZRUqkmJIQJKvSVcWapflps=";
+          aarch64 = "sha256-rd5xDbYQkUOpwohOSsASaTojJOs63z/Bp3jH0SW/4eI=";
         }
         .${cpu};
     };
@@ -190,7 +191,7 @@ let
           ../config
         ];
       };
-      hash = "sha256-Z1wQEivZId4bR/YXN14nvGvtF6V8eyDjfMnOyEfmnsk=";
+      hash = "sha256-oioii4ZaFc+hmfwJ6YMjH1yS2Z6pivrhisj9vTVRZ5M=";
     };
 
     nativeBuildInputs = [ pkgs.postgresql ];

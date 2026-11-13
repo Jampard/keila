@@ -1,4 +1,3 @@
-# Modified by EklipseTech, 2026; see NOTICE.
 defmodule KeilaWeb.UserAdminController do
   use KeilaWeb, :controller
   alias Keila.{Auth, Accounts, Admin}
@@ -144,7 +143,7 @@ defmodule KeilaWeb.UserAdminController do
   defp authorize(conn, _) do
     case conn.assigns.is_admin? do
       true -> conn
-      false -> conn |> put_status(404) |> text("Not Found") |> halt()
+      false -> raise KeilaWeb.NotFoundError
     end
   end
 end

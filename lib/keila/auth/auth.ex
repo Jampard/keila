@@ -70,6 +70,8 @@ defmodule Keila.Auth do
     Token
   }
 
+  require Token
+
   @type token_url_fn :: (String.t() -> String.t())
 
   defp default_url_function(token) do
@@ -425,6 +427,7 @@ defmodule Keila.Auth do
 
   @doc """
   Updates user password from params.
+  On success, deletes all tokens of the user except API keys.
 
   ## Example
       update_user_password(user_id, %{"password" => "NewSecurePassword"})
@@ -432,9 +435,16 @@ defmodule Keila.Auth do
   @spec update_user_password(User.id(), map()) ::
           {:ok, User.t()} | {:error, Ecto.Changeset.t(User.t())}
   def update_user_password(id, params) do
-    Repo.get(User, id)
-    |> User.update_password_changeset(params)
-    |> Repo.update()
+    changeset = Repo.get(User, id) |> User.update_password_changeset(params)
+
+    Repo.transact(fn ->
+      with {:ok, user} <- Repo.update(changeset) do
+        Token.by_user_and_scopes_query(user.id, Token.scopes() -- ["api"])
+        |> Repo.delete_all()
+
+        {:ok, user}
+      end
+    end)
   end
 
   @doc """
@@ -567,7 +577,7 @@ defmodule Keila.Auth do
   Finds and returns `Token` specified by `key` and `scope`. Returns `nil` if no such `Token` exists.
   """
   @spec find_token(String.t(), String.t()) :: Token.t() | nil
-  def find_token(key, scope) do
+  def find_token(key, scope) when Token.is_scope(scope) do
     Token.find_token_query(key, scope)
     |> Repo.one()
   end
@@ -578,7 +588,7 @@ defmodule Keila.Auth do
   Use this instead of `find_token/2` when you want to ensure a token can only be used once.
   """
   @spec find_and_delete_token(String.t(), String.t()) :: Token.t() | nil
-  def find_and_delete_token(key, scope) do
+  def find_and_delete_token(key, scope) when Token.is_scope(scope) do
     Token.find_token_query(key, scope)
     |> select([t], t)
     |> Repo.delete_all(returning: :all)

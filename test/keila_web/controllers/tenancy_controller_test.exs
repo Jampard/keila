@@ -162,7 +162,7 @@ defmodule KeilaWeb.TenancyControllerTest do
       b_project: b
     } do
       assert member |> get(Routes.project_path(member, :show, a)) |> html_response(200)
-      assert member |> get(Routes.project_path(member, :show, b)) |> Map.fetch!(:status) == 404
+      assert_error_sent 404, fn -> get(member, Routes.project_path(member, :show, b)) end
     end
 
     test "cannot create a project or delete the shop's", %{member: member, a_project: a} do

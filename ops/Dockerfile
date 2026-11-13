@@ -1,6 +1,6 @@
 # Modified by EklipseTech, 2026; see NOTICE.
 # Not the deployed build: this fork's image is flake.nix packages.<linux>.image (see NOTICE).
-FROM docker.io/library/elixir:1.18-alpine@sha256:caa6412c072c4b11e8c6798108388702c2791b4f8bad41e42c27ea5be881e2dc AS build
+FROM docker.io/library/elixir:1.20-otp-29-alpine AS build
 
 ARG WITH_EXTRA=0
 ARG KEILA_CLOUD=0
@@ -25,7 +25,7 @@ RUN mix deps.clean mime --build && \
     mix assets.deploy && \
     mix release
 
-FROM docker.io/library/elixir:1.18-otp-27-alpine@sha256:34260a722c6a6fa659aad9dd09e73466f5692a899e7edb60d43b0d51d4738c4f
+FROM docker.io/library/elixir:1.20-otp-29-alpine
 ENV HOME=/opt/app
 
 WORKDIR ${HOME}

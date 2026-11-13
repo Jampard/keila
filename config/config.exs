@@ -104,9 +104,9 @@ config :keila, Oban,
   ],
   repo: Keila.Repo,
   plugins: [
-    {Oban.Plugins.Pruner, max_age: 1800},
-    {Oban.Plugins.Lifeline, rescue_after: :timer.minutes(10)},
-    {Oban.Plugins.Cron,
+    {Oban.Pruner, max_age: 1800},
+    {Oban.Lifeline, rescue_after: :timer.minutes(10)},
+    {Oban.Cron,
      crontab: [
        {"* * * * *", Keila.Mailings.DeliverScheduledCampaignsWorker},
        {"* * * * *", Keila.Mailings.CampaignRenderRescueWorker},
@@ -126,7 +126,7 @@ config :mime, :types, %{
 # Configure locales
 config :keila, KeilaWeb.Gettext,
   default_locale: "en",
-  locales: ["de", "en", "es", "fr", "hu", "it", "bg", "pt_BR"]
+  locales: ["de", "en", "es", "fr", "hu", "it", "bg", "pt_BR", "sv"]
 
 config :ex_cldr,
   default_backend: Keila.Cldr

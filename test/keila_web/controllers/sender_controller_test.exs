@@ -1,4 +1,3 @@
-# Modified by EklipseTech, 2026; see NOTICE.
 defmodule KeilaWeb.SenderControllerTest do
   use KeilaWeb.ConnCase, async: false
   require Keila
@@ -141,11 +140,11 @@ defmodule KeilaWeb.SenderControllerTest do
 
     other_user = insert!(:activated_user)
 
-    conn =
-      with_login(conn, user: other_user)
-      |> get(Routes.sender_path(conn, :edit, project.id, sender.id))
+    conn = with_login(conn, user: other_user)
 
-    assert response(conn, 404) == "Not Found"
+    assert_error_sent 404, fn ->
+      get(conn, Routes.sender_path(conn, :edit, project.id, sender.id))
+    end
   end
 
   @tag :sender_controller

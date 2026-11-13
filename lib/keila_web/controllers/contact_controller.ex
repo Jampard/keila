@@ -1,4 +1,3 @@
-# Modified by EklipseTech, 2026; see NOTICE.
 defmodule KeilaWeb.ContactController do
   use KeilaWeb, :controller
   import Phoenix.LiveView.Controller
@@ -239,10 +238,7 @@ defmodule KeilaWeb.ContactController do
 
     case Contacts.get_project_contact(project_id, contact_id) do
       nil ->
-        conn
-        |> put_status(404)
-        |> text("Not Found")
-        |> halt()
+        raise KeilaWeb.NotFoundError
 
       contact ->
         assign(conn, :contact, contact)

@@ -86,7 +86,7 @@ defmodule KeilaWeb.Router do
     get "/admin/users/new", UserAdminController, :new
     post "/admin/users", UserAdminController, :create
     delete "/admin/users", UserAdminController, :delete
-    get "/admin/users/:id/impersonate", UserAdminController, :impersonate
+    post "/admin/users/:id/impersonate", UserAdminController, :impersonate
     get "/admin/users/:id/credits", UserAdminController, :show_credits
     post "/admin/users/:id/credits", UserAdminController, :create_credits
 
@@ -143,7 +143,6 @@ defmodule KeilaWeb.Router do
     get "/projects/:project_id/forms", FormController, :index
     get "/projects/:project_id/forms/new", FormController, :new
     get "/projects/:project_id/forms/:id", FormController, :edit
-    put "/projects/:project_id/forms/:id", FormController, :post_edit
     delete "/projects/:project_id/forms", FormController, :delete
 
     get "/projects/:project_id/templates", TemplateController, :index
@@ -212,10 +211,6 @@ defmodule KeilaWeb.Router do
     get "/c/:encoded_url/:message_id/:link_id/:hmac", TrackingController, :track_click
 
     get "/archive/:id", PublicCampaignController, :show
-
-    # DEPRECATED: These routes will be removed in a future Keila release
-    get "/unsubscribe/:project_id/:contact_id", PublicFormController, :unsubscribe
-    post "/unsubscribe/:project_id/:contact_id", PublicFormController, :unsubscribe
   end
 
   scope "/uploads", KeilaWeb do

@@ -36,7 +36,7 @@
       system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
-        beam = pkgs.beam27Packages;
+        beam = pkgs.beam29Packages;
 
         # Off 5432/8443/8444 and below platform's 8600+ worktree lattice: shared CI runners host both.
         ports = {
@@ -55,7 +55,7 @@
           modules = [
             {
               packages = [
-                beam.elixir_1_18
+                beam.elixir_1_20
                 beam.erlang
                 pkgs.nodejs
                 pkgs.dprint

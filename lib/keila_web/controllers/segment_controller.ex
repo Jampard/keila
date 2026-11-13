@@ -1,4 +1,3 @@
-# Modified by EklipseTech, 2026; see NOTICE.
 defmodule KeilaWeb.SegmentController do
   use KeilaWeb, :controller
   alias Keila.{Contacts, Contacts.Segment}
@@ -88,10 +87,7 @@ defmodule KeilaWeb.SegmentController do
 
     case Contacts.get_project_segment(project_id, segment_id) do
       nil ->
-        conn
-        |> put_status(404)
-        |> text("Not Found")
-        |> halt()
+        raise KeilaWeb.NotFoundError
 
       segment ->
         assign(conn, :segment, segment)

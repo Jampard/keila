@@ -47,7 +47,7 @@ defmodule KeilaWeb.ProjectPlugTest do
     assert html_response(show(conn), 200)
 
     push_shop!(2, "suspended")
-    assert response(show(conn), 404) == "Not Found"
+    assert_error_sent 404, fn -> show(conn) end
 
     push_shop!(3, "live")
     assert html_response(show(conn), 200)
