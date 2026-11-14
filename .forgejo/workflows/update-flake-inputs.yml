@@ -1,0 +1,61 @@
+name: Update Flake Inputs
+on:
+  schedule:
+    - cron: "37 4 * * *"
+  workflow_dispatch:
+concurrency:
+  group: update-flake-inputs
+  cancel-in-progress: true
+jobs:
+  update-flake-inputs:
+    runs-on: nix
+    steps:
+      - uses: mirrors/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.CI_BOT_TOKEN }}
+      - name: Private inputs over this forge's own URL with ci-bot's token, for every ssh forge the lock reads
+        env:
+          CI_BOT_TOKEN: ${{ secrets.CI_BOT_TOKEN }}
+        run: |
+          server="${GITHUB_SERVER_URL%/}"
+          forge="${server%%://*}://ci-bot:${CI_BOT_TOKEN}@${server#*://}/"
+          srcs=$(node -e '
+          const lock = JSON.parse(require("fs").readFileSync("flake.lock", "utf8"));
+          const urls = Object.values(lock.nodes).flatMap((n) => [n.locked?.url, n.original?.url]);
+          const forges = new Set(urls.map((u) => /^ssh:\/\/forgejo@[^/]+\//.exec(u ?? "")?.[0]).filter(Boolean));
+          if (forges.size === 0) throw new Error("flake.lock reads no ssh forge: nothing to rewrite");
+          console.log([...forges].join("\n"));')
+          for src in $srcs; do git config --global --add url."$forge".insteadOf "$src"; done
+          git config --global user.email "ci-bot@${server#*://}"
+          git config --global user.name "ci-bot"
+      - name: Update flake inputs (the pinned mirror's flake, from this forge; a copied action dir loses its git worktree)
+        env:
+          GITEA_TOKEN: ${{ secrets.CI_BOT_TOKEN }}
+        run: |
+          host="${GITHUB_SERVER_URL#*://}"; host="${host%/}"
+          nix --extra-experimental-features 'nix-command flakes' run \
+            "git+${GITHUB_SERVER_URL%/}/mirrors/update-flake-inputs-gitea?rev=49f6b1006a8e9a284511911fa46240c39d4bac69#update-flake-inputs" -- \
+            --gitea-url "$GITHUB_SERVER_URL" --gitea-token "$GITEA_TOKEN" --gitea-repository "$GITHUB_REPOSITORY" \
+            --exclude-patterns 'flake.nix#predecessor' --base-branch main --branch-suffix '' \
+            --git-author-name ci-bot --git-author-email "ci-bot@$host" \
+            --git-committer-name ci-bot --git-committer-email "ci-bot@$host" \
+            --auto-merge --merge-style default
+      - name: Queue the updater's PRs (the queue/merge label; ci-bot is not on the merge whitelist)
+        env:
+          GITEA_TOKEN: ${{ secrets.CI_BOT_TOKEN }}
+        run: |
+          node -e '
+          const api = `${process.env.GITHUB_SERVER_URL}/api/v1/repos/${process.env.GITHUB_REPOSITORY}`;
+          const headers = { Authorization: `token ${process.env.GITEA_TOKEN}`, "Content-Type": "application/json" };
+          (async () => {
+            const prs = await (await fetch(`${api}/pulls?state=open&limit=50`, { headers })).json();
+            for (const pr of prs.filter((p) => p.user.login === "ci-bot")) {
+              const res = await fetch(`${api}/issues/${pr.number}/labels`, { method: "POST", headers, body: JSON.stringify({ labels: ["queue/merge"] }) });
+              const labels = await res.json();
+              if (!Array.isArray(labels) || !labels.some((l) => l.name === "queue/merge")) {
+                console.error(`#${pr.number}: the queue/merge label did not stick`);
+                process.exitCode = 1;
+              }
+            }
+          })();'

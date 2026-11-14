@@ -2,7 +2,8 @@
   description = "Keila: the deployed release (packages.<linux>.keila) and its image";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/b6c98e9e6633ee64753b594ff4a5febf0367fc00";
+    toolchain.url = "git+ssh://forgejo@git.build-eklipse.internal:2222/eklipsetech/toolchain.git?ref=main";
+    nixpkgs.follows = "toolchain/nixpkgs";
     flake-utils.url = "github:numtide/flake-utils";
     systems.url = "github:nix-systems/default";
   };
