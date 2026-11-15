@@ -219,7 +219,7 @@ let
       runHook postBuild
     '';
 
-    installPhase = "touch $out";
+    installPhase = "mkdir -p $out/bin";
     postFixup = "";
   };
 
