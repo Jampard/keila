@@ -94,15 +94,28 @@ defmodule Keila.Mailings.MessagePrunerTest do
   } do
     batch_size = MessagePruner.batch_size()
 
-    insert_n!(:message, batch_size + 1, fn _n ->
-      [
-        project: project,
+    old = days_ago(threshold + 1)
+
+    1..(batch_size + 1)
+    |> Enum.map(fn n ->
+      %{
+        project_id: project.id,
+        recipient_email: "recipient-#{n}@example.com",
+        subject: "Test Subject",
         status: :sent,
         html_body: "sent",
         text_body: "sent",
-        updated_at: days_ago(threshold + 1)
-      ]
+        cc: [],
+        bcc: [],
+        headers: %{},
+        priority: 100,
+        render_attempt: 0,
+        inserted_at: old,
+        updated_at: old
+      }
     end)
+    |> Enum.chunk_every(2_000)
+    |> Enum.each(&Repo.insert_all(Message, &1))
 
     MessagePruner.perform(%Oban.Job{})
 
