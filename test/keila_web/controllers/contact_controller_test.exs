@@ -185,8 +185,12 @@ defmodule KeilaWeb.ContactControllerTest do
     |> element("#import-form")
     |> render_submit(%{csv: csv})
 
+    assert Enum.any?(1..200, fn _ ->
+             render(lv) =~ "You have successfully imported 201 contacts!" or
+               (Process.sleep(50) && false)
+           end)
+
     assert Keila.Contacts.get_project_contacts(project.id) |> Enum.count() == 201
-    assert render(lv) =~ "You have successfully imported 201 contacts!"
   end
 
   @tag :contact_controller
