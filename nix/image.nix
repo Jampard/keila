@@ -140,6 +140,8 @@ let
     postInstall = ''
       install -Dm644 LICENSE.md NOTICE -t "$out/share/licenses/keila"
     '';
+
+    passthru.erlangVersion = beam.erlang.version;
   };
 
   # A test-only dep's precompiled NIF, downloaded at compile time; the hashes are its checksum.exs.
@@ -166,18 +168,23 @@ let
     mixEnv = "test";
     src = lib.fileset.toSource {
       root = ../.;
-      fileset = lib.fileset.difference (lib.fileset.unions [
-        ../mix.exs
-        ../mix.lock
-        ../.formatter.exs
-        ../config
-        ../lib
-        ../priv
-        ../test
-      ]) (lib.fileset.unions [
-        (lib.fileset.maybeMissing ../priv/cldr)
-        ../test/extra
-      ]);
+      fileset =
+        lib.fileset.difference
+          (lib.fileset.unions [
+            ../mix.exs
+            ../mix.lock
+            ../.formatter.exs
+            ../config
+            ../lib
+            ../priv
+            ../test
+          ])
+          (
+            lib.fileset.unions [
+              (lib.fileset.maybeMissing ../priv/cldr)
+              ../test/extra
+            ]
+          );
     };
     mixFodDeps = beam.fetchMixDeps {
       pname = "keila-mix-deps-test";

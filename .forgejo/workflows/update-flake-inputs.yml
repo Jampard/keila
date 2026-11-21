@@ -14,7 +14,7 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.CI_BOT_TOKEN }}
-      - name: Private inputs over this forge's own URL with ci-bot's token, for every ssh forge the lock reads
+      - name: Private inputs over this forge's own URL with ci-bot's token, for every ssh forge the lock reads (none, by checks.public-inputs)
         env:
           CI_BOT_TOKEN: ${{ secrets.CI_BOT_TOKEN }}
         run: |
@@ -24,7 +24,6 @@ jobs:
           const lock = JSON.parse(require("fs").readFileSync("flake.lock", "utf8"));
           const urls = Object.values(lock.nodes).flatMap((n) => [n.locked?.url, n.original?.url]);
           const forges = new Set(urls.map((u) => /^ssh:\/\/forgejo@[^/]+\//.exec(u ?? "")?.[0]).filter(Boolean));
-          if (forges.size === 0) throw new Error("flake.lock reads no ssh forge: nothing to rewrite");
           console.log([...forges].join("\n"));')
           for src in $srcs; do git config --global --add url."$forge".insteadOf "$src"; done
           git config --global user.email "ci-bot@${server#*://}"

@@ -2,8 +2,7 @@
   description = "Keila: the deployed release (packages.<linux>.keila) and its image";
 
   inputs = {
-    toolchain.url = "git+ssh://forgejo@git.build-eklipse.internal:2222/eklipsetech/toolchain.git?ref=main";
-    nixpkgs.follows = "toolchain/nixpkgs";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     flake-utils.url = "github:numtide/flake-utils";
     systems.url = "github:nix-systems/default";
   };
@@ -16,7 +15,20 @@
       systems,
       ...
     }:
-    flake-utils.lib.eachSystem (import systems) (
+    {
+      nixosModules.keila =
+        { lib, pkgs, ... }:
+        {
+          options.services.keila.package = lib.mkOption {
+            type = lib.types.package;
+            default = self.packages.${pkgs.stdenv.hostPlatform.system}.keila;
+            defaultText = lib.literalExpression "keila.packages.\${system}.keila";
+            description = "The Keila release a host runs; `passthru.erlangVersion` names the OTP it was built on.";
+          };
+        };
+      nixosModules.default = self.nixosModules.keila;
+    }
+    // flake-utils.lib.eachSystem (import systems) (
       system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
@@ -67,9 +79,22 @@
           inherit (image) keila image;
           default = image.image;
         };
-        checks = nixpkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
+        checks = {
+          public-inputs = import ./nix/public-inputs.nix {
+            inherit pkgs;
+            locks = [
+              ./flake.lock
+              ./dev/flake.lock
+            ];
+          };
+        }
+        // nixpkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
           inherit (image) test;
           release = image.keila;
+          smoke = import ./nix/smoke-test.nix {
+            inherit pkgs;
+            module = self.nixosModules.keila;
+          };
         };
       }
     );
