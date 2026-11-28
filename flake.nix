@@ -16,15 +16,11 @@
       ...
     }:
     {
+      # The consumer (endo services/keila) declares services.keila.package; this only sets it.
       nixosModules.keila =
         { lib, pkgs, ... }:
         {
-          options.services.keila.package = lib.mkOption {
-            type = lib.types.package;
-            default = self.packages.${pkgs.stdenv.hostPlatform.system}.keila;
-            defaultText = lib.literalExpression "keila.packages.\${system}.keila";
-            description = "The Keila release a host runs; `passthru.erlangVersion` names the OTP it was built on.";
-          };
+          services.keila.package = lib.mkDefault self.packages.${pkgs.stdenv.hostPlatform.system}.keila;
         };
       nixosModules.default = self.nixosModules.keila;
     }

@@ -3,9 +3,19 @@
 pkgs.testers.runNixOSTest {
   name = "keila-smoke";
   nodes.machine =
-    { config, pkgs, ... }:
     {
-      imports = [ module ];
+      config,
+      lib,
+      pkgs,
+      ...
+    }:
+    {
+      imports = [
+        module
+        {
+          options.services.keila.package = lib.mkOption { type = lib.types.package; };
+        }
+      ];
       virtualisation.memorySize = 2048;
       services.postgresql = {
         enable = true;
